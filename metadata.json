@@ -1,0 +1,6 @@
+{
+  "name": "Rakyat Menggugat",
+  "description": "Platform Bantuan AI Permohonan Konstitusional & Uji Materiil (MK & MA) untuk Warga Negara",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

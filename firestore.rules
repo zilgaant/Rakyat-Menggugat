@@ -1,0 +1,103 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return request.auth != null && 
+        exists(/databases/$(database)/documents/admin_reviewers/$(request.auth.uid));
+    }
+
+    function isOwnerOfCase(caseId) {
+      return request.auth != null &&
+        get(/databases/$(database)/documents/cases/$(caseId)).data.user_id == request.auth.uid;
+    }
+
+    // --- USERS COLLECTION ---
+    // Users can read/write their own profile strictly by request.auth.uid (covers both email and anonymous auth)
+    match /users/{userId} {
+      allow read, write: if isOwner(userId) || isAdmin();
+    }
+
+    // --- CASES COLLECTION & SUBCOLLECTIONS (v1.1 Schema) ---
+    // Cases and subcollections are strictly protected by parent case ownership
+    match /cases/{caseId} {
+      allow create: if request.auth != null && 
+        request.resource.data.user_id == request.auth.uid;
+      allow read, update, delete: if request.auth != null && 
+        (resource.data.user_id == request.auth.uid || isAdmin());
+
+      // Subcollection: cases/{caseId}/messages
+      match /messages/{messageId} {
+        allow read, write: if isOwnerOfCase(caseId) || isAdmin();
+      }
+
+      // Subcollection: cases/{caseId}/evidence_items
+      match /evidence_items/{evidenceId} {
+        allow read, write: if isOwnerOfCase(caseId) || isAdmin();
+      }
+
+      // Subcollection: cases/{caseId}/assessments
+      match /assessments/{assessmentId} {
+        allow read, write: if isOwnerOfCase(caseId) || isAdmin();
+      }
+
+      // Subcollection: cases/{caseId}/generated_documents
+      match /generated_documents/{docId} {
+        allow read, write: if isOwnerOfCase(caseId) || isAdmin();
+      }
+
+      // Subcollection: cases/{caseId}/consents
+      match /consents/{consentId} {
+        allow read, write: if isOwnerOfCase(caseId) || isAdmin();
+      }
+
+      // Subcollection: cases/{caseId}/statement_form
+      match /statement_form/{formId} {
+        allow read, write: if isOwnerOfCase(caseId) || isAdmin();
+      }
+    }
+
+    // --- LEGAL KNOWLEDGE ENTRIES & VERSIONS SUBCOLLECTIONS ---
+    // Publicly readable by all citizens; Writable ONLY by admin processes
+    match /legal_knowledge_entries/{entryId} {
+      allow read: if true;
+      allow write: if isAdmin();
+
+      // Subcollection: versions/{versionId}
+      match /versions/{versionId} {
+        allow read: if true;
+        allow write: if isAdmin();
+      }
+    }
+
+    // --- V2-READY COLLECTIONS ---
+    // Lawyer Profiles: Publicly readable for verified lawyers, write by owner lawyer or admin
+    match /lawyer_profiles/{lawyerId} {
+      allow read: if true;
+      allow write: if isOwner(lawyerId) || isAdmin();
+    }
+
+    // Lawyer Match Requests: Readable/Writable only by involved citizen user, lawyer, or admin
+    match /lawyer_match_requests/{requestId} {
+      allow create: if request.auth != null && 
+        (request.resource.data.user_id == request.auth.uid || isAdmin());
+      allow read, update, delete: if 
+        (request.auth != null && (resource.data.user_id == request.auth.uid || resource.data.lawyer_id == request.auth.uid)) ||
+        isAdmin();
+    }
+
+    // Admin Reviewers: Read/Write strictly restricted to Admins
+    match /admin_reviewers/{adminId} {
+      allow read, write: if isAdmin();
+    }
+  }
+}

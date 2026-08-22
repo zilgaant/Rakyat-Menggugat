@@ -1,0 +1,165 @@
+{
+  "entities": {
+    "UserProfile": {
+      "collection": "users",
+      "fields": {
+        "id": { "type": "string", "description": "User UID or pseudonym token (e.g. anon_xyz)" },
+        "auth_mode": { "type": "string", "description": "email or anonim_pseudonim" },
+        "email": { "type": "string", "description": "Email address if registered via email" },
+        "pseudonim_token": { "type": "string", "description": "Pseudonym token for anonymous sessions" },
+        "tipe_pengguna": { "type": "string", "description": "individu, kelompok_sipil, or badan_hukum" },
+        "preferensi_bahasa": { "type": "string", "description": "id, jv, or su" },
+        "organisasi": { "type": "object", "description": "Organization details if civic group/legal entity" },
+        "privacy_policy_accepted_at": { "type": "string", "description": "Timestamp of global privacy policy consent" },
+        "created_at": { "type": "string", "description": "Creation timestamp" },
+        "deleted_at": { "type": "string", "description": "Deletion timestamp for UU PDP right to erasure" }
+      }
+    },
+    "CaseRecord": {
+      "collection": "cases",
+      "fields": {
+        "id": { "type": "string", "description": "Unique case identifier" },
+        "user_id": { "type": "string", "description": "Owner user UID or pseudonym token" },
+        "judul_singkat": { "type": "string", "description": "Short title of petition" },
+        "status": { "type": "string", "description": "draft, assessed, document_generated, closed" },
+        "ringkasan_masalah_asli": { "type": "string", "description": "Citizen original complaint statement" },
+        "bahasa_input": { "type": "string", "description": "id, jv, or su" },
+        "ai_disclaimer_accepted_at": { "type": "string", "description": "Timestamp of per-case AI disclaimer consent" },
+        "created_at": { "type": "string", "description": "Creation timestamp" },
+        "updated_at": { "type": "string", "description": "Last update timestamp" }
+      }
+    },
+    "CaseMessage": {
+      "collection": "cases/{caseId}/messages",
+      "fields": {
+        "id": { "type": "string", "description": "Message ID" },
+        "case_id": { "type": "string", "description": "Parent case ID" },
+        "role": { "type": "string", "description": "user, agent_intake, agent_analysis, or agent_verifier" },
+        "content": { "type": "string", "description": "Message content" },
+        "content_translated": { "type": "string", "description": "Translated content if regional language" },
+        "created_at": { "type": "string", "description": "Message timestamp" }
+      }
+    },
+    "CaseEvidenceItem": {
+      "collection": "cases/{caseId}/evidence_items",
+      "fields": {
+        "id": { "type": "string", "description": "Evidence ID" },
+        "case_id": { "type": "string", "description": "Parent case ID" },
+        "kode": { "type": "string", "description": "Code e.g. P-1, P-2" },
+        "jenis": { "type": "string", "description": "bukti_tertulis, keterangan_ahli, keterangan_saksi, petunjuk" },
+        "deskripsi": { "type": "string", "description": "Evidence description" },
+        "relevansi_hukum": { "type": "string", "description": "Legal relevance to constitutional rights" },
+        "status": { "type": "string", "description": "disarankan, sudah_disiapkan_user, terverifikasi" },
+        "created_at": { "type": "string", "description": "Creation timestamp" }
+      }
+    },
+    "CaseAssessment": {
+      "collection": "cases/{caseId}/assessments",
+      "fields": {
+        "id": { "type": "string", "description": "Assessment ID" },
+        "case_id": { "type": "string", "description": "Parent case ID" },
+        "agent_analysis_run_id": { "type": "string", "description": "Agent 2 run ID" },
+        "agent_verifier_run_id": { "type": "string", "description": "Agent 3 run ID" },
+        "hasil_akhir": { "type": "string", "description": "layak, perlu_data_tambahan, tidak_layak" },
+        "confidence_level": { "type": "string", "description": "tinggi, sedang, rendah" },
+        "agent_agreement": { "type": "boolean", "description": "Boolean agreement indicator" },
+        "status_tampil_ke_user": { "type": "string", "description": "Display status" },
+        "catatan_ketidaksesuaian": { "type": "string", "description": "Discrepancy notes" },
+        "catatan_ambiguitas": { "type": "string", "description": "Ambiguity flags from independent verification" },
+        "layers": { "type": "array", "description": "4-layer assessment details" },
+        "ringkasan_untuk_user": { "type": "string", "description": "Plain language summary" },
+        "created_at": { "type": "string", "description": "Creation timestamp" }
+      }
+    },
+    "GeneratedDocument": {
+      "collection": "cases/{caseId}/generated_documents",
+      "fields": {
+        "id": { "type": "string", "description": "Document ID" },
+        "case_id": { "type": "string", "description": "Parent case ID" },
+        "tipe_dokumen": { "type": "string", "description": "draft_permohonan_mk, draft_permohonan_ma, daftar_alat_bukti" },
+        "konten_markdown": { "type": "string", "description": "Generated draft text in Markdown" },
+        "versi": { "type": "number", "description": "Document version number" },
+        "created_at": { "type": "string", "description": "Creation timestamp" }
+      }
+    },
+    "CaseConsent": {
+      "collection": "cases/{caseId}/consents",
+      "fields": {
+        "id": { "type": "string", "description": "Consent record ID" },
+        "case_id": { "type": "string", "description": "Parent case ID" },
+        "user_id": { "type": "string", "description": "Consenting user ID or token" },
+        "consent_type": { "type": "string", "description": "ai_disclaimer, terms_of_service, privacy_policy" },
+        "accepted_at": { "type": "string", "description": "Acceptance timestamp" }
+      }
+    },
+    "StatementForm": {
+      "collection": "cases/{caseId}/statement_form",
+      "fields": {
+        "id": { "type": "string", "description": "Statement form record ID" },
+        "case_id": { "type": "string", "description": "Parent case ID" },
+        "tipe_pernyataan": { "type": "string", "description": "mandiri, didampingi_advokat, atau didampingi_organisasi" },
+        "nama_pendamping": { "type": "string", "description": "Counsel name if applicable" },
+        "nomor_kta_advokat": { "type": "string", "description": "Bar association ID if applicable" },
+        "submitted_at": { "type": "string", "description": "Submission timestamp" }
+      }
+    },
+    "LegalKnowledgeEntry": {
+      "collection": "legal_knowledge_entries",
+      "fields": {
+        "id": { "type": "string", "description": "Unique entry identifier" },
+        "sumber": { "type": "string", "description": "jdih_mk, jdihn, jdih_ma, seed_manual" },
+        "jenis_dokumen": { "type": "string", "description": "uud, uu, pp, pmk, perpres, perda, putusan_mk, putusan_ma" },
+        "nomor": { "type": "string", "description": "Document number/article" },
+        "tahun": { "type": "string", "description": "Year of enactment" },
+        "judul": { "type": "string", "description": "Title" },
+        "status_berlaku": { "type": "string", "description": "berlaku, dicabut, diubah" },
+        "current_version_id": { "type": "string", "description": "Foreign key to active version in subcollection" },
+        "last_synced_at": { "type": "string", "description": "Sync timestamp" }
+      }
+    },
+    "LegalKnowledgeVersion": {
+      "collection": "legal_knowledge_entries/{entryId}/versions",
+      "fields": {
+        "id": { "type": "string", "description": "Version ID" },
+        "entry_id": { "type": "string", "description": "Parent entry ID" },
+        "versi_ke": { "type": "number", "description": "Sequential version number" },
+        "isi_teks": { "type": "string", "description": "Full normative legal text of this version" },
+        "catatan_perubahan": { "type": "string", "description": "Change notes or amendment reference" },
+        "tanggal_berlaku_versi": { "type": "string", "description": "Effective date of version" },
+        "created_at": { "type": "string", "description": "Creation timestamp" }
+      }
+    },
+    "LawyerProfile": {
+      "collection": "lawyer_profiles",
+      "fields": {
+        "id": { "type": "string", "description": "Lawyer user ID" },
+        "nama_lengkap": { "type": "string", "description": "Full name with titles" },
+        "organisasi_advokat": { "type": "string", "description": "Bar association name (e.g. PERADI)" },
+        "nomor_induk_advokat": { "type": "string", "description": "License number" },
+        "spesialisasi": { "type": "array", "description": "Areas of expertise (e.g. Hukum Tata Negara, Hak Asasi Manusia)" },
+        "status_verifikasi": { "type": "string", "description": "menunggu, terverifikasi, ditolak" },
+        "pro_bono_available": { "type": "boolean", "description": "Willingness to take pro bono constitutional cases" }
+      }
+    },
+    "LawyerMatchRequest": {
+      "collection": "lawyer_match_requests",
+      "fields": {
+        "id": { "type": "string", "description": "Match request ID" },
+        "case_id": { "type": "string", "description": "Target case ID" },
+        "user_id": { "type": "string", "description": "Citizen user ID" },
+        "lawyer_id": { "type": "string", "description": "Assigned lawyer ID if matched" },
+        "status": { "type": "string", "description": "pending, accepted, rejected, completed" },
+        "created_at": { "type": "string", "description": "Request timestamp" }
+      }
+    },
+    "AdminReviewer": {
+      "collection": "admin_reviewers",
+      "fields": {
+        "id": { "type": "string", "description": "Admin UID" },
+        "email": { "type": "string", "description": "Official admin email" },
+        "role": { "type": "string", "description": "super_admin, legal_auditor, knowledge_curator" },
+        "created_at": { "type": "string", "description": "Created timestamp" }
+      }
+    }
+  }
+}
