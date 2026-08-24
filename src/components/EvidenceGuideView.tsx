@@ -425,53 +425,70 @@ export const EvidenceGuideView: React.FC<EvidenceGuideViewProps> = ({
         </div>
 
         {/* POIN MANDAT REQUEST: ACTION BAR PRINT SEMUA & DOWNLOAD SEMUA DI BAWAH BOX FOKUS KASUS ANDA */}
-        <div className="bg-stone-900 text-white rounded-lg p-4 sm:p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-md border border-stone-800">
-          <div className="space-y-1">
+        <div className="bg-stone-900 text-white rounded-lg p-5 sm:p-6 space-y-4 shadow-md border border-stone-800">
+          <div className="space-y-2">
             <div className="flex items-center gap-2 text-xs font-bold text-rose-300 uppercase tracking-wider">
-              <Package className="w-4 h-4 text-rose-400" />
+              <Package className="w-4 h-4 text-rose-400 shrink-0" />
               <span>Paket Dokumen & Panduan Lengkap (Aksesibilitas Warga)</span>
             </div>
-            <h3 className="font-serif font-bold text-base sm:text-lg text-white">
+            <h3 className="font-serif font-bold text-lg sm:text-xl text-white">
               Cetak atau Unduh Seluruh Dokumen & Panduan Sekaligus
             </h3>
-            <p className="text-xs text-stone-300 leading-relaxed max-w-2xl">
+            <p className="text-xs sm:text-sm text-stone-300 leading-relaxed max-w-3xl">
               Mencakup lembar checklist fisik, salinan UU resmi dari Pasal.id, formulir pengaduan instansi, formulir permohonan uji lab, panduan pengambilan foto/video berstandar bukti MK, serta step-by-step fotokopi hingga legalisasi Kantor Pos.
             </p>
             {downloadNotice && (
               <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-300 bg-emerald-950/80 border border-emerald-700 px-3 py-1 rounded mt-1">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
                 <span>{downloadNotice}</span>
               </div>
             )}
           </div>
 
-          <div className="flex flex-wrap items-center gap-2.5 shrink-0 w-full sm:w-auto">
+          <div className="pt-2 border-t border-stone-800/80 flex flex-wrap items-center gap-2.5 sm:gap-3">
             <button
               onClick={handleDownloadAllPacket}
-              className="flex-1 sm:flex-initial px-4 py-2.5 bg-stone-800 hover:bg-stone-700 text-white rounded-md text-xs font-semibold flex items-center justify-center gap-2 border border-stone-600 transition shadow-xs cursor-pointer active:scale-95"
+              className="flex-1 sm:flex-initial px-4 py-2.5 bg-stone-800 hover:bg-stone-700 text-white rounded-md text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 border border-stone-600 transition shadow-xs cursor-pointer active:scale-95 whitespace-nowrap"
               title="Unduh langsung berkas Word (.DOC) berisi seluruh dokumen, formulir, dan panduan lengkap"
             >
-              <Download className="w-4 h-4 text-rose-300" />
+              <Download className="w-4 h-4 text-rose-300 shrink-0" />
               <span>Download Semua (.DOC / Berkas)</span>
             </button>
             <button
               onClick={handlePrintAllPacket}
-              className="flex-1 sm:flex-initial px-4 py-2.5 bg-[#881337] hover:bg-[#70102e] text-white rounded-md text-xs font-semibold flex items-center justify-center gap-2 transition shadow-xs border border-rose-900 cursor-pointer active:scale-95"
+              className="flex-1 sm:flex-initial px-4 py-2.5 bg-[#881337] hover:bg-[#70102e] text-white rounded-md text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 transition shadow-xs border border-rose-900 cursor-pointer active:scale-95 whitespace-nowrap"
               title="Cetak langsung seluruh paket dokumen dan panduan siap bawa tanpa halaman kosong"
             >
-              <Printer className="w-4 h-4" />
+              <Printer className="w-4 h-4 shrink-0" />
               <span>Print Semua Panduan & Berkas</span>
             </button>
             <button
               onClick={() => setIsPacketModalOpen(true)}
-              className="px-3 py-2.5 bg-stone-950 hover:bg-stone-800 text-stone-300 hover:text-white rounded-md text-xs font-medium flex items-center justify-center gap-1.5 border border-stone-700 transition cursor-pointer"
+              className="px-3.5 py-2.5 bg-stone-950 hover:bg-stone-800 text-stone-300 hover:text-white rounded-md text-xs sm:text-sm font-medium flex items-center justify-center gap-1.5 border border-stone-700 transition cursor-pointer whitespace-nowrap"
               title="Buka jendela pratinjau interaktif per kategori"
             >
-              <BookOpen className="w-3.5 h-3.5" />
+              <BookOpen className="w-3.5 h-3.5 shrink-0" />
               <span>Pratinjau / Salin Teks</span>
             </button>
           </div>
         </div>
+      </div>
+
+      {/* Quick Jump: Duplicate 'Buat Dokumen Resmi' button directly below the top box */}
+      <div className="bg-stone-100/90 border border-stone-300/80 rounded-lg p-3.5 sm:p-4 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xs">
+        <div className="flex items-center gap-2.5 text-stone-800 text-xs sm:text-sm">
+          <FileCheck className="w-4 h-4 sm:w-5 sm:h-5 text-rose-900 shrink-0" />
+          <span className="font-medium text-stone-700">
+            Ingin langsung membuat draf berkas permohonan tanpa membaca seluruh daftar bukti?
+          </span>
+        </div>
+        <button
+          onClick={handleProceedWithScroll}
+          className="w-full sm:w-auto shrink-0 bg-[#881337] hover:bg-[#70102e] text-white px-5 py-2.5 rounded-md text-xs sm:text-sm font-semibold transition flex items-center justify-center gap-2 shadow-xs border border-rose-900 cursor-pointer active:scale-95 whitespace-nowrap"
+        >
+          <span>Buat Dokumen Resmi</span>
+          <ArrowRight className="w-4 h-4 shrink-0" />
+        </button>
       </div>
 
       <DisclaimerBanner compact />
@@ -1152,9 +1169,9 @@ export const EvidenceGuideView: React.FC<EvidenceGuideViewProps> = ({
 
         <button
           onClick={handleProceedWithScroll}
-          className="w-full sm:w-auto bg-[#881337] hover:bg-[#70102e] text-white px-6 py-2.5 rounded-md text-xs font-semibold transition flex items-center justify-center gap-2 shadow-xs border border-rose-900 cursor-pointer"
+          className="w-full sm:w-auto bg-[#881337] hover:bg-[#70102e] text-white px-6 py-2.5 rounded-md text-xs font-semibold transition flex items-center justify-center gap-2 shadow-xs border border-rose-900 cursor-pointer active:scale-95"
         >
-          <span>Lanjut ke Generator Dokumen Resmi (Buku I & II)</span>
+          <span>Buat Dokumen Resmi</span>
           <ArrowRight className="w-4 h-4" />
         </button>
       </div>

@@ -14,6 +14,7 @@ import { EvidenceGuideView } from './components/EvidenceGuideView';
 import { DocumentGeneratorView } from './components/DocumentGeneratorView';
 import { AccountPrivacyView } from './components/AccountPrivacyView';
 import { LegalKnowledgeBaseView } from './components/LegalKnowledgeBaseView';
+import { LawyerDirectoryView } from './components/LawyerDirectoryView';
 import { 
   UserProfile, 
   CaseRecord, 
@@ -26,10 +27,9 @@ import {
 } from './types';
 import { SEED_LEGAL_KNOWLEDGE } from './data/seedKnowledge';
 import { firestoreService } from './services/firestoreService';
-import { ensureFirebaseAuth, auth } from './lib/firebase';
-import { onAuthStateChanged } from 'firebase/auth';
+import { ensureFirebaseAuth } from './lib/firebase';
 
-type ScreenType = 'home' | 'cases' | 'chat' | 'assessment' | 'evidence' | 'document' | 'privacy' | 'knowledge';
+type ScreenType = 'home' | 'cases' | 'chat' | 'assessment' | 'evidence' | 'document' | 'privacy' | 'knowledge' | 'lawyers';
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<ScreenType>('home');
@@ -421,54 +421,80 @@ export default function App() {
         })
       });
 
-      let botContent = 'Poin fakta telah dicatat secara sistematis. Dari uraian Anda, objek yang dipersoalkan berkaitan dengan potensi kerugian hak warga negara. Silakan klik tombol "Lakukan Uji Kelayakan" di bawah untuk menjalankan evaluasi independen 4 lapis secara otomatis.';
+      let botMessagesList: string[] = [];
       let formalParaphrase = updatedSummary;
+      let isComplete = false;
+      let currentStep = 1;
 
       if (response.ok) {
         const data = await response.json();
-        if (data.message) botContent = data.message;
+        if (Array.isArray(data.messages) && data.messages.length > 0) {
+          botMessagesList = data.messages;
+        } else if (typeof data.message === 'string' && data.message.trim()) {
+          botMessagesList = data.message.split(/\n\n+/).map((s: string) => s.trim()).filter(Boolean);
+        }
+
+        if (data.is_clarification_complete !== undefined) isComplete = data.is_clarification_complete;
+        if (data.current_step !== undefined) currentStep = data.current_step;
         if (data.formal_indonesian_paraphrase) {
           formalParaphrase = data.formal_indonesian_paraphrase;
-          // Update case with the formal Indonesian legal paraphrase as canonical foundation
-          const enrichedCase: CaseRecord = {
-            ...updatedCase,
-            ringkasan_masalah_asli: formalParaphrase,
-            updated_at: new Date().toISOString()
-          };
-          setCases(prev => prev.map(c => c.id === activeCase.id ? enrichedCase : c));
-          firestoreService.saveCase(enrichedCase);
         }
+
+        const enrichedCase: CaseRecord = {
+          ...updatedCase,
+          ringkasan_masalah_asli: formalParaphrase,
+          current_clarification_step: currentStep,
+          is_clarification_complete: isComplete,
+          updated_at: new Date().toISOString()
+        };
+        setCases(prev => prev.map(c => c.id === activeCase.id ? enrichedCase : c));
+        firestoreService.saveCase(enrichedCase);
       }
 
-      const botMsgId = `msg-${Date.now() + 1}`;
-      const botResponse: CaseMessage = {
-        id: botMsgId,
+      if (botMessagesList.length === 0) {
+        botMessagesList = ['Poin fakta telah dicatat secara sistematis. Dari uraian Anda, objek yang dipersoalkan berkaitan dengan potensi kerugian hak warga negara.'];
+      }
+
+      const newBotMessages: CaseMessage[] = botMessagesList.map((contentStr, idx) => ({
+        id: `msg-${Date.now()}-${idx}-${Math.random().toString(36).substring(2, 6)}`,
         case_id: activeCase.id,
         role: 'agent_intake',
-        content: botContent,
-        created_at: new Date().toISOString(),
-      };
+        content: contentStr,
+        created_at: new Date(Date.now() + idx * 100).toISOString(),
+      }));
 
       setCaseMessages(prev => ({
         ...prev,
-        [activeCase.id]: [...updatedHistory, botResponse]
+        [activeCase.id]: [...updatedHistory, ...newBotMessages]
       }));
-      firestoreService.saveMessage(botResponse);
+
+      for (const bMsg of newBotMessages) {
+        firestoreService.saveMessage(bMsg);
+      }
     } catch {
       // Fallback local response
-      const botMsgId = `msg-${Date.now() + 1}`;
-      const fallbackResponse: CaseMessage = {
-        id: botMsgId,
+      const fallbackList = [
+        'Poin fakta telah dicatat secara sistematis.',
+        'Dari uraian Anda, objek yang dipersoalkan berkaitan dengan potensi kerugian hak warga negara.',
+        'Silakan lengkapi keterangan atau klik tombol "Konfirmasi Fakta & Lakukan Uji Kelayakan" untuk menjalankan evaluasi independen.'
+      ];
+
+      const fallbackMessages: CaseMessage[] = fallbackList.map((contentStr, idx) => ({
+        id: `msg-${Date.now()}-${idx}`,
         case_id: activeCase.id,
         role: 'agent_intake',
-        content: 'Poin fakta telah dicatat secara sistematis. Dari uraian Anda, objek yang dipersoalkan berkaitan dengan potensi kerugian hak warga negara. Silakan klik tombol "Lakukan Uji Kelayakan" di bawah untuk menjalankan evaluasi independen 4 lapis secara otomatis.',
-        created_at: new Date().toISOString(),
-      };
+        content: contentStr,
+        created_at: new Date(Date.now() + idx * 100).toISOString(),
+      }));
+
       setCaseMessages(prev => ({
         ...prev,
-        [activeCase.id]: [...updatedHistory, fallbackResponse]
+        [activeCase.id]: [...updatedHistory, ...fallbackMessages]
       }));
-      firestoreService.saveMessage(fallbackResponse);
+
+      for (const fMsg of fallbackMessages) {
+        firestoreService.saveMessage(fMsg);
+      }
     } finally {
       setIsAgentTyping(false);
     }
@@ -845,6 +871,7 @@ export default function App() {
               }
               handleStartNewCase();
             }}
+            onOpenLawyers={() => setCurrentScreen('lawyers')}
           />
         )}
 
@@ -894,6 +921,10 @@ export default function App() {
               setCurrentScreen('chat');
             }}
             onRetryAndStartNewCase={() => handleRetryFailedCaseAndStartNew(activeCase.id)}
+            onOpenLawyers={() => {
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+              setCurrentScreen('lawyers');
+            }}
           />
         )}
 
@@ -947,29 +978,47 @@ export default function App() {
             }}
           />
         )}
+
+        {currentScreen === 'lawyers' && (
+          <LawyerDirectoryView
+            currentUser={currentUser}
+            cases={cases}
+            activeCaseId={activeCaseId}
+            onSelectCaseForConsultation={(caseId) => {
+              setActiveCaseId(caseId);
+            }}
+            onStartNewCase={handleStartNewCase}
+          />
+        )}
       </main>
 
-      {/* Footer */}
-      <footer className="print:hidden border-t border-stone-200 bg-stone-100 text-stone-700 py-8 px-4 sm:px-6 lg:px-8 mt-12 text-xs">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2 font-serif font-bold text-stone-900 text-sm">
-            <span className="w-6 h-6 rounded bg-[#881337] text-white flex items-center justify-center text-xs">RM</span>
-            <span>Rakyat Menggugat</span>
+      {/* Footer - Hidden in Chat view for pristine full-height messenger layout */}
+      {currentScreen !== 'chat' && (
+        <footer className="print:hidden border-t border-stone-200 bg-stone-100 text-stone-700 py-8 px-4 sm:px-6 lg:px-8 mt-12 text-xs">
+          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-2 font-serif font-bold text-stone-900 text-sm">
+              <span className="w-6 h-6 rounded bg-[#881337] text-white flex items-center justify-center text-xs">RM</span>
+              <span>Rakyat Menggugat</span>
+            </div>
+            <p className="text-center sm:text-left text-stone-600">
+              Platform nirlaba bantuan penyusunan permohonan konstitusional mandiri. Bukan representasi advokat resmi.
+            </p>
+            <div className="flex items-center gap-4 text-stone-600 font-medium">
+              <button onClick={() => setCurrentScreen('lawyers')} className="hover:underline cursor-pointer">
+                Bursa Advokat
+              </button>
+              <span>•</span>
+              <button onClick={() => setCurrentScreen('privacy')} className="hover:underline cursor-pointer">
+                Kebijakan Privasi (UU PDP)
+              </button>
+              <span>•</span>
+              <button onClick={() => setCurrentScreen('home')} className="hover:underline cursor-pointer">
+                Edukasi MK vs MA
+              </button>
+            </div>
           </div>
-          <p className="text-center sm:text-left text-stone-600">
-            Platform nirlaba bantuan penyusunan permohonan konstitusional mandiri. Bukan representasi advokat resmi.
-          </p>
-          <div className="flex items-center gap-4 text-stone-600 font-medium">
-            <button onClick={() => setCurrentScreen('privacy')} className="hover:underline">
-              Kebijakan Privasi (UU PDP)
-            </button>
-            <span>•</span>
-            <button onClick={() => setCurrentScreen('home')} className="hover:underline">
-              Edukasi MK vs MA
-            </button>
-          </div>
-        </div>
-      </footer>
+        </footer>
+      )}
 
       {/* Auth & Pseudonym Dialog Modal */}
       <AuthModal

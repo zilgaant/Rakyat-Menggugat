@@ -11,7 +11,18 @@
 
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
-import firebaseConfigJson from '../firebase-applet-config.json';
+import fs from 'fs';
+import path from 'path';
+
+let firebaseConfigJson: any = {};
+try {
+  const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
+  if (fs.existsSync(configPath)) {
+    firebaseConfigJson = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+  }
+} catch {
+  // Ignore fallback
+}
 
 // Usage: npx tsx scripts/seed_admin.ts <ADMIN_UID> <ADMIN_EMAIL> [ROLE]
 // Or via environment variables: ADMIN_UID, ADMIN_EMAIL, ADMIN_ROLE

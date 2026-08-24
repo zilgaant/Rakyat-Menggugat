@@ -14,6 +14,7 @@ interface AssessmentReportViewProps {
   onProceedToEvidence: () => void;
   onBackToChat: () => void;
   onRetryAndStartNewCase?: () => void;
+  onOpenLawyers?: () => void;
 }
 
 export const AssessmentReportView: React.FC<AssessmentReportViewProps> = ({
@@ -22,6 +23,7 @@ export const AssessmentReportView: React.FC<AssessmentReportViewProps> = ({
   onProceedToEvidence,
   onBackToChat,
   onRetryAndStartNewCase,
+  onOpenLawyers,
 }) => {
   const [isEvaluationDetailOpen, setIsEvaluationDetailOpen] = useState(false);
 
@@ -308,13 +310,25 @@ export const AssessmentReportView: React.FC<AssessmentReportViewProps> = ({
         </button>
 
         {assessment.hasil_akhir !== 'tidak_layak' ? (
-          <button
-            onClick={handleProceedToEvidence}
-            className="w-full sm:w-auto bg-[#881337] hover:bg-[#70102e] text-white px-6 py-2.5 rounded-md text-xs font-semibold transition flex items-center justify-center gap-2 shadow-xs border border-rose-900 cursor-pointer"
-          >
-            <span>Lengkapi Bukti</span>
-            <ArrowRight className="w-4 h-4" />
-          </button>
+          <div className="flex flex-col sm:flex-row items-center gap-2.5 w-full sm:w-auto">
+            {onOpenLawyers && (
+              <button
+                onClick={onOpenLawyers}
+                className="w-full sm:w-auto bg-stone-100 hover:bg-stone-200 text-stone-800 border border-stone-300 px-4 py-2.5 rounded-md text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer"
+              >
+                <Briefcase className="w-3.5 h-3.5 text-stone-600" />
+                <span>Konsultasi Advokat</span>
+              </button>
+            )}
+
+            <button
+              onClick={handleProceedToEvidence}
+              className="w-full sm:w-auto bg-[#881337] hover:bg-[#70102e] text-white px-6 py-2.5 rounded-md text-xs font-semibold transition flex items-center justify-center gap-2 shadow-xs border border-rose-900 cursor-pointer"
+            >
+              <span>Lengkapi Bukti</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
         ) : (
           <div className="flex flex-col sm:flex-row items-center gap-2.5 w-full sm:w-auto">
             <button
@@ -325,15 +339,16 @@ export const AssessmentReportView: React.FC<AssessmentReportViewProps> = ({
               <span>Coba lagi</span>
             </button>
 
-            <button
-              disabled
-              className="w-full sm:w-auto bg-stone-100 text-stone-400 border border-stone-300 px-5 py-2.5 rounded-md text-xs font-semibold flex items-center justify-center gap-2 cursor-not-allowed select-none opacity-80"
-              title="Fitur Bursa Lawyer akan segera hadir untuk menghubungkan Anda dengan advokat berlisensi."
-            >
-              <Briefcase className="w-4 h-4 text-stone-400" />
-              <span>Kontak Pengacara</span>
-              <span className="text-[10px] bg-stone-200 text-stone-600 px-1.5 py-0.5 rounded font-normal">Bursa Lawyer</span>
-            </button>
+            {onOpenLawyers ? (
+              <button
+                onClick={onOpenLawyers}
+                className="w-full sm:w-auto bg-stone-100 hover:bg-stone-200 text-stone-800 border border-stone-300 px-5 py-2.5 rounded-md text-xs font-semibold flex items-center justify-center gap-2 transition cursor-pointer"
+              >
+                <Briefcase className="w-4 h-4 text-[#881337]" />
+                <span>Kontak Pengacara</span>
+                <span className="text-[10px] bg-rose-100 text-[#881337] px-1.5 py-0.5 rounded font-bold">Bursa Advokat</span>
+              </button>
+            ) : null}
           </div>
         )}
       </div>

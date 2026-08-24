@@ -30,6 +30,7 @@ import { SEED_LEGAL_KNOWLEDGE } from '../data/seedKnowledge';
 export const firestoreService = {
   // --- USER PROFILE & PRIVACY POLICY CONSENT ---
   async saveUserProfile(user: UserProfile): Promise<void> {
+    if (!db) return;
     try {
       const userRef = doc(db, 'users', user.id);
       await setDoc(userRef, user, { merge: true });
@@ -39,6 +40,7 @@ export const firestoreService = {
   },
 
   async getUserProfile(userId: string): Promise<UserProfile | null> {
+    if (!db) return null;
     try {
       const userRef = doc(db, 'users', userId);
       const snap = await getDoc(userRef);
@@ -54,6 +56,7 @@ export const firestoreService = {
 
   // --- CASES ---
   async saveCase(caseRecord: CaseRecord): Promise<void> {
+    if (!db) return;
     try {
       const caseRef = doc(db, 'cases', caseRecord.id);
       await setDoc(caseRef, caseRecord, { merge: true });
@@ -63,6 +66,7 @@ export const firestoreService = {
   },
 
   async getCasesByUser(userId: string): Promise<CaseRecord[]> {
+    if (!db) return [];
     try {
       const q = query(collection(db, 'cases'), where('user_id', '==', userId));
       const snap = await getDocs(q);
@@ -76,12 +80,14 @@ export const firestoreService = {
   },
 
   async deleteCase(caseId: string): Promise<void> {
+    if (!db) return;
     try {
       // Delete subcollections: messages, evidence_items, assessments, generated_documents, consents, statement_form
       const collections = ['messages', 'evidence_items', 'assessments', 'generated_documents', 'consents', 'statement_form'];
       
       await Promise.all(collections.map(async (colName) => {
         try {
+          if (!db) return;
           const snap = await getDocs(collection(db, 'cases', caseId, colName));
           await Promise.all(snap.docs.map(d => deleteDoc(d.ref)));
         } catch (subErr) {
@@ -99,6 +105,7 @@ export const firestoreService = {
 
   // --- SUBCOLLECTION: cases/{caseId}/messages/{messageId} ---
   async saveMessage(message: CaseMessage): Promise<void> {
+    if (!db) return;
     try {
       const msgRef = doc(db, 'cases', message.case_id, 'messages', message.id);
       await setDoc(msgRef, message);
@@ -108,6 +115,7 @@ export const firestoreService = {
   },
 
   async getMessagesByCase(caseId: string): Promise<CaseMessage[]> {
+    if (!db) return [];
     try {
       const messagesRef = collection(db, 'cases', caseId, 'messages');
       const snap = await getDocs(messagesRef);
@@ -122,6 +130,7 @@ export const firestoreService = {
 
   // --- SUBCOLLECTION: cases/{caseId}/assessments/{assessmentId} ---
   async saveAssessment(assessment: DualAgentAssessment): Promise<void> {
+    if (!db) return;
     try {
       const asmRef = doc(db, 'cases', assessment.case_id, 'assessments', assessment.id);
       await setDoc(asmRef, assessment, { merge: true });
@@ -131,6 +140,7 @@ export const firestoreService = {
   },
 
   async getAssessmentByCase(caseId: string): Promise<DualAgentAssessment | null> {
+    if (!db) return null;
     try {
       const asmCol = collection(db, 'cases', caseId, 'assessments');
       const snap = await getDocs(asmCol);
@@ -150,6 +160,7 @@ export const firestoreService = {
 
   // --- SUBCOLLECTION: cases/{caseId}/evidence_items/{evidenceId} ---
   async saveEvidenceItem(item: EvidenceItem): Promise<{ success: boolean; error?: string }> {
+    if (!db) return { success: true };
     try {
       const evRef = doc(db, 'cases', item.case_id, 'evidence_items', item.id);
       await setDoc(evRef, item, { merge: true });
@@ -161,6 +172,7 @@ export const firestoreService = {
   },
 
   async batchSaveEvidenceItems(items: EvidenceItem[]): Promise<{ success: boolean; error?: string }> {
+    if (!db) return { success: true };
     try {
       for (const item of items) {
         const evRef = doc(db, 'cases', item.case_id, 'evidence_items', item.id);
@@ -174,6 +186,7 @@ export const firestoreService = {
   },
 
   async deleteEvidenceItem(caseId: string, evidenceId: string): Promise<{ success: boolean; error?: string }> {
+    if (!db) return { success: true };
     try {
       const evRef = doc(db, 'cases', caseId, 'evidence_items', evidenceId);
       await deleteDoc(evRef);
@@ -185,6 +198,7 @@ export const firestoreService = {
   },
 
   async getEvidenceByCase(caseId: string): Promise<EvidenceItem[]> {
+    if (!db) return [];
     try {
       const evCol = collection(db, 'cases', caseId, 'evidence_items');
       const snap = await getDocs(evCol);
@@ -204,6 +218,7 @@ export const firestoreService = {
 
   // --- SUBCOLLECTION: cases/{caseId}/consents/{consentId} ---
   async saveConsent(caseId: string, userId: string, consentType: string): Promise<void> {
+    if (!db) return;
     try {
       const consentId = `consent-${Date.now()}`;
       const consentRef = doc(db, 'cases', caseId, 'consents', consentId);
@@ -221,6 +236,7 @@ export const firestoreService = {
 
   // --- SUBCOLLECTION: cases/{caseId}/statement_form/{formId} ---
   async saveStatementForm(caseId: string, type: string, counselName?: string, barNumber?: string): Promise<void> {
+    if (!db) return;
     try {
       const formId = `form-${Date.now()}`;
       const formRef = doc(db, 'cases', caseId, 'statement_form', formId);
@@ -239,6 +255,7 @@ export const firestoreService = {
 
   // --- LEGAL KNOWLEDGE: legal_knowledge_entries/{entryId}/versions/{versionId} ---
   async saveLegalKnowledgeEntry(entry: LegalKnowledgeEntry, version?: LegalKnowledgeVersion): Promise<void> {
+    if (!db) return;
     try {
       const entryRef = doc(db, 'legal_knowledge_entries', entry.id);
       await setDoc(entryRef, entry, { merge: true });
@@ -254,6 +271,7 @@ export const firestoreService = {
   },
 
   async getLegalKnowledgeEntries(): Promise<LegalKnowledgeEntry[]> {
+    if (!db) return [];
     try {
       const colRef = collection(db, 'legal_knowledge_entries');
       const snap = await getDocs(colRef);
@@ -267,6 +285,7 @@ export const firestoreService = {
   },
 
   async getLegalKnowledgeVersions(entryId: string): Promise<LegalKnowledgeVersion[]> {
+    if (!db) return [];
     try {
       const verCol = collection(db, 'legal_knowledge_entries', entryId, 'versions');
       const snap = await getDocs(verCol);
@@ -280,6 +299,7 @@ export const firestoreService = {
   },
 
   async seedKnowledgeBaseIfNeeded(): Promise<void> {
+    if (!db) return;
     try {
       for (const item of SEED_LEGAL_KNOWLEDGE) {
         // 1. Save entry document without isi_teks (pointer to current_version_id)
@@ -318,6 +338,7 @@ export const firestoreService = {
 
   // --- UU PDP RIGHT TO ERASURE (Delete all user data) ---
   async purgeUserData(userId: string): Promise<void> {
+    if (!db) return;
     try {
       const userRef = doc(db, 'users', userId);
       await deleteDoc(userRef);

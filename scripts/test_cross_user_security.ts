@@ -20,15 +20,26 @@ import {
   signInWithEmailAndPassword,
   signOut 
 } from 'firebase/auth';
-import firebaseConfigJson from '../firebase-applet-config.json';
+import fs from 'fs';
+import path from 'path';
+
+let firebaseConfigJson: any = {};
+try {
+  const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
+  if (fs.existsSync(configPath)) {
+    firebaseConfigJson = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+  }
+} catch {
+  // Ignore fallback
+}
 
 const firebaseConfig = {
-  apiKey: firebaseConfigJson.apiKey,
-  authDomain: firebaseConfigJson.authDomain,
-  projectId: firebaseConfigJson.projectId,
-  storageBucket: firebaseConfigJson.storageBucket,
-  messagingSenderId: firebaseConfigJson.messagingSenderId,
-  appId: firebaseConfigJson.appId,
+  apiKey: firebaseConfigJson.apiKey || '',
+  authDomain: firebaseConfigJson.authDomain || '',
+  projectId: firebaseConfigJson.projectId || '',
+  storageBucket: firebaseConfigJson.storageBucket || '',
+  messagingSenderId: firebaseConfigJson.messagingSenderId || '',
+  appId: firebaseConfigJson.appId || '',
 };
 
 async function runSecurityTest() {

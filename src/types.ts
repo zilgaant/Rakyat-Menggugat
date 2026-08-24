@@ -41,6 +41,8 @@ export interface CaseRecord {
   ringkasan_masalah_asli: string;
   bahasa_input: LanguagePreference;
   ai_disclaimer_accepted_at?: string | null; // Per-case disclaimer acceptance
+  current_clarification_step?: number; // 1, 2, 3, or 4 (complete)
+  is_clarification_complete?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -267,14 +269,50 @@ export interface ETLSyncJobResult {
   log_pesan: string[];
 }
 
-// Placeholder for future v2 features
+export interface LawyerCertification {
+  id: string;
+  judul: string;
+  penerbit: string;
+  tahun: string;
+  nomor_registrasi?: string;
+  status: 'Aktif' | 'Terdaftar';
+}
+
+export interface LawyerCasePortfolio {
+  id: string;
+  judul_perkara: string;
+  nomor_putusan?: string;
+  mahkamah: 'MK' | 'MA' | 'PTUN';
+  objek_uji: string;
+  tahun: string;
+  hasil_amar: string;
+  ringkasan_peran: string;
+}
+
 export interface LawyerProfile {
   id: string;
   nama: string;
+  gelar: string;
   no_izin_advokat: string;
-  model_kerjasama: 'pro_bono' | 'berbayar';
-  area_keahlian: string;
+  organisasi_advokat: string;
+  pendidikan_terakhir: string;
+  pendidikan_detail: string[];
+  area_keahlian: string[];
+  sertifikasi: LawyerCertification[];
+  portfolio_kasus: LawyerCasePortfolio[];
+  ketersediaan_pro_bono: boolean;
+  model_kerjasama: 'pro_bono' | 'berbayar' | 'subsidi_silang';
   status_verifikasi: 'belum_diverifikasi' | 'terverifikasi';
+  kota: string;
+  email: string;
+  telepon: string;
+  ringkasan_bio: string;
+  foto_avatar_placeholder: {
+    initials: string;
+    bg_color: string;
+    text_color: string;
+  };
+  total_advokasi_selesai: number;
   created_at: string;
 }
 
