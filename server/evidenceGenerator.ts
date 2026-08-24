@@ -62,6 +62,8 @@ export function generateDynamicEvidenceMatrix(
     relevansi_hukum: 'Membuktikan kualifikasi Pemohon sebagai Perorangan Warga Negara Indonesia (WNI) yang sah menurut Pasal 51 ayat (1) huruf a UU Mahkamah Konstitusi.',
     posita_dalil_terkait: 'Kedudukan Hukum (Legal Standing) Pemohon - Syarat 1 Putusan MK No. 006/PUU-III/2005.',
     syarat_legalisasi: 'Wajib Legalisasi/Pemeteraian di Kantor Pos (Meterai Tempel Rp10.000 + Cap Pos)',
+    url_rujukan_pasal_id: 'https://pasal.id/peraturan/uu/uu-no-24-tahun-2003',
+    frbr_uri: '/akn/id/act/uu/2003/24',
     status: 'disarankan',
     created_at: dateNow,
     updated_at: dateNow,
@@ -69,14 +71,28 @@ export function generateDynamicEvidenceMatrix(
 
   // 2. BUKTI P-2: OBJEK PENGUJIAN (Naskah Resmi UU)
   let uuDeskripsi = 'Salinan Lembaran Negara Republik Indonesia dari Undang-Undang yang Dimohonkan Pengujian';
+  let uuPasalIdUrl = 'https://pasal.id';
+  let uuFrbrUri = '/akn/id/act/uud/1945/1';
+
   if (substantiveElements?.objek_norma_uu) {
     uuDeskripsi = `Salinan Lembaran Negara RI ${substantiveElements.objek_norma_uu}`;
+    uuPasalIdUrl = 'https://pasal.id/search?q=' + encodeURIComponent(substantiveElements.objek_norma_uu);
   } else if (isLabor) {
-    uuDeskripsi = 'Salinan Lembaran Negara RI UU No. 6 Tahun 2023 tentang Cipta Kerja (Klaster Ketenagakerjaan)';
+    uuDeskripsi = 'Salinan Lembaran Negara RI UU No. 6 Tahun 2023 tentang Penetapan Perppu Cipta Kerja Menjadi UU';
+    uuPasalIdUrl = 'https://pasal.id/peraturan/uu/uu-no-6-tahun-2023';
+    uuFrbrUri = '/akn/id/act/uu/2023/6';
+  } else if (isSpeech) {
+    uuDeskripsi = 'Salinan Lembaran Negara RI UU No. 1 Tahun 2024 tentang Perubahan Kedua UU ITE';
+    uuPasalIdUrl = 'https://pasal.id/peraturan/uu/uu-no-1-tahun-2024';
+    uuFrbrUri = '/akn/id/act/uu/2024/1';
   } else if (isMiningOrEnv) {
     uuDeskripsi = 'Salinan Lembaran Negara RI UU No. 3 Tahun 2020 tentang Pertambangan Mineral dan Batubara';
+    uuPasalIdUrl = 'https://pasal.id/peraturan/uu/uu-no-3-tahun-2020';
+    uuFrbrUri = '/akn/id/act/uu/2020/3';
   } else if (isAgrarian) {
     uuDeskripsi = 'Salinan Lembaran Negara RI UU No. 6 Tahun 2023 (Ketentuan Bank Tanah dan Pengelolaan Lahan)';
+    uuPasalIdUrl = 'https://pasal.id/peraturan/uu/uu-no-6-tahun-2023';
+    uuFrbrUri = '/akn/id/act/uu/2023/6';
   }
 
   items.push({
@@ -89,6 +105,8 @@ export function generateDynamicEvidenceMatrix(
     relevansi_hukum: 'Membuktikan keberadaan objek norma hukum yang dimohonkan pengujian materiil terhadap UUD 1945.',
     posita_dalil_terkait: 'Kewenangan Mahkamah Konstitusi (Pasal 24C ayat 1 UUD 1945 jo. Pasal 10 UU MK).',
     syarat_legalisasi: 'Dokumen Resmi Lembaran Negara / Berita Negara (Bebas Bea Meterai)',
+    url_rujukan_pasal_id: uuPasalIdUrl,
+    frbr_uri: uuFrbrUri,
     status: 'disarankan',
     created_at: dateNow,
     updated_at: dateNow,
@@ -137,8 +155,10 @@ export function generateDynamicEvidenceMatrix(
       kategori: 'doktrin_ahli',
       deskripsi: 'Data Komparasi Risalah Pembahasan UU Cipta Kerja & Kajian Dampak Fleksibilitas Kerja terhadap Hak Konstitusional Pekerja',
       relevansi_hukum: 'Membuktikan pertentangan substantif norma terhadap prinsip keadilan sosial dan doktrin pemenuhan hak asasi atas pekerjaan.',
-      posita_dalil_terkait: 'Posita: Analisis Pertentangan Komprehensif dengan Prinsip Keadilan Substantif.',
+      posita_dalil_terkait: 'Posita: Analisis Pertentangan Komprehensif dengan Prinsip Keadilan Substantif (Putusan MK No. 168/PUU-XXI/2023).',
       syarat_legalisasi: 'Dokumen Pendukung / Kajian Akademik',
+      url_rujukan_pasal_id: 'https://pasal.id/peraturan/putusan-mk/puu-mk-168-2023',
+      frbr_uri: '/akn/id/judgment/puu-mk/2023/168',
       status: 'disarankan',
       created_at: dateNow,
       updated_at: dateNow,
@@ -157,6 +177,8 @@ export function generateDynamicEvidenceMatrix(
       relevansi_hukum: 'Membuktikan terjadinya pencemaran nyata dan rusaknya sumber air bersih yang menjadi hajat hidup vital masyarakat desa.',
       posita_dalil_terkait: 'Posita: Kerugian Faktual Aktual atas Hak Lingkungan Hidup yang Bersih dan Sehat (Pasal 28H ayat 1 UUD 1945).',
       syarat_legalisasi: 'Wajib Legalisasi/Pemeteraian di Kantor Pos (Meterai Tempel Rp10.000 + Cap Pos)',
+      url_rujukan_pasal_id: 'https://pasal.id/peraturan/putusan-mk/puu-mk-85-2013',
+      frbr_uri: '/akn/id/judgment/puu-mk/2013/85',
       status: 'disarankan',
       created_at: dateNow,
       updated_at: dateNow,
@@ -172,6 +194,8 @@ export function generateDynamicEvidenceMatrix(
       relevansi_hukum: 'Membuktikan bahwa penerbitan izin sentralistik tanpa persetujuan warga merupakan akibat langsung dari keberlakuan norma UU Minerba.',
       posita_dalil_terkait: 'Posita: Hubungan Kausalitas (Causal Verband) & Ketiadaan Ruang Partisipasi Publik yang Bermakna.',
       syarat_legalisasi: 'Wajib Legalisasi/Pemeteraian di Kantor Pos (Meterai Tempel Rp10.000 + Cap Pos)',
+      url_rujukan_pasal_id: 'https://pasal.id/peraturan/uu/uu-no-3-tahun-2020',
+      frbr_uri: '/akn/id/act/uu/2020/3',
       status: 'disarankan',
       created_at: dateNow,
       updated_at: dateNow,
@@ -187,6 +211,8 @@ export function generateDynamicEvidenceMatrix(
       relevansi_hukum: 'Membuktikan pelanggaran asas demokrasi ekonomi berwawasan lingkungan sebagaimana diatur dalam Pasal 33 ayat (4) UUD 1945.',
       posita_dalil_terkait: 'Posita: Pertentangan dengan Pasal 33 ayat (3) dan (4) UUD 1945.',
       syarat_legalisasi: 'Dokumen Pendukung / Surat Pengaduan Resmi',
+      url_rujukan_pasal_id: 'https://pasal.id/peraturan/putusan-mk/puu-mk-85-2013',
+      frbr_uri: '/akn/id/judgment/puu-mk/2013/85',
       status: 'disarankan',
       created_at: dateNow,
       updated_at: dateNow,
@@ -205,6 +231,8 @@ export function generateDynamicEvidenceMatrix(
       relevansi_hukum: 'Membuktikan hak penguasaan dan pemanfaatan lahan pertanian secara sah dan berkelanjutan oleh Pemohon dan masyarakat adat.',
       posita_dalil_terkait: 'Posita: Pengakuan Hak Masyarakat Hukum Adat dan Hak Milik Perseorangan yang Tidak Boleh Dirampas Sewenang-wenang.',
       syarat_legalisasi: 'Wajib Legalisasi/Pemeteraian di Kantor Pos (Meterai Tempel Rp10.000 + Cap Pos)',
+      url_rujukan_pasal_id: 'https://pasal.id/peraturan/putusan-mk/puu-mk-35-2012',
+      frbr_uri: '/akn/id/judgment/puu-mk/2012/35',
       status: 'disarankan',
       created_at: dateNow,
       updated_at: dateNow,
@@ -220,6 +248,8 @@ export function generateDynamicEvidenceMatrix(
       relevansi_hukum: 'Membuktikan adanya ancaman penggusuran aktual tanpa proses musyawarah yang setara dan tanpa ganti rugi yang layak.',
       posita_dalil_terkait: 'Posita: Hubungan Kausalitas antara Pengaturan Bank Tanah dengan Kerugian Hak Pemohon.',
       syarat_legalisasi: 'Wajib Legalisasi/Pemeteraian di Kantor Pos (Meterai Tempel Rp10.000 + Cap Pos)',
+      url_rujukan_pasal_id: 'https://pasal.id/peraturan/uu/uu-no-6-tahun-2023',
+      frbr_uri: '/akn/id/act/uu/2023/6',
       status: 'disarankan',
       created_at: dateNow,
       updated_at: dateNow,
@@ -235,6 +265,8 @@ export function generateDynamicEvidenceMatrix(
       relevansi_hukum: 'Membuktikan bahwa perampasan hak atas tanah tradisional bertentangan dengan prinsip negara hukum dan perlindungan hak asasi.',
       posita_dalil_terkait: 'Posita: Pertentangan dengan Pasal 28D ayat (1) dan Pasal 33 ayat (3) UUD 1945.',
       syarat_legalisasi: 'Wajib Legalisasi/Pemeteraian di Kantor Pos (Meterai Tempel Rp10.000 + Cap Pos)',
+      url_rujukan_pasal_id: 'https://pasal.id/peraturan/putusan-mk/puu-mk-35-2012',
+      frbr_uri: '/akn/id/judgment/puu-mk/2012/35',
       status: 'disarankan',
       created_at: dateNow,
       updated_at: dateNow,
@@ -253,6 +285,8 @@ export function generateDynamicEvidenceMatrix(
       relevansi_hukum: 'Membuktikan adanya proses hukum pidana nyata (aktual) yang dialami Pemohon akibat penggunaan pasal karet norma a quo.',
       posita_dalil_terkait: 'Posita: Kerugian Aktual atas Kebebasan Berpendapat dan Menyatakan Pikiran (Pasal 28E ayat 3 UUD 1945).',
       syarat_legalisasi: 'Wajib Legalisasi/Pemeteraian di Kantor Pos (Meterai Tempel Rp10.000 + Cap Pos)',
+      url_rujukan_pasal_id: 'https://pasal.id/peraturan/uu/uu-no-1-tahun-2024',
+      frbr_uri: '/akn/id/act/uu/2024/1',
       status: 'disarankan',
       created_at: dateNow,
       updated_at: dateNow,
@@ -268,6 +302,25 @@ export function generateDynamicEvidenceMatrix(
       relevansi_hukum: 'Membuktikan bahwa rumusan pasal tidak memenuhi asas lex certa dan lex stricta dalam negara hukum.',
       posita_dalil_terkait: 'Posita: Pelanggaran Asas Legalitas dan Kepastian Hukum yang Adil (Pasal 28D ayat 1 UUD 1945).',
       syarat_legalisasi: 'Dokumen Pendukung / Kajian Ahli Hukum',
+      url_rujukan_pasal_id: 'https://pasal.id/peraturan/putusan-mk/puu-mk-50-2008',
+      frbr_uri: '/akn/id/judgment/puu-mk/2008/50',
+      status: 'disarankan',
+      created_at: dateNow,
+      updated_at: dateNow,
+    });
+
+    items.push({
+      id: `ev-${caseId}-p5`,
+      case_id: caseId,
+      kode: 'P-5',
+      jenis: 'bukti_tertulis',
+      kategori: 'doktrin_ahli',
+      deskripsi: 'Kajian Komparatif Hak Digital & Deklarasi Kebebasan Berekspresi Internasional Terkait Perlindungan Whistleblower / Kritik Warga',
+      relevansi_hukum: 'Membuktikan bahwa kritik publik terhadap pejabat atau kebijakan bukan merupakan tindak pidana pencemaran nama baik melainkan partisipasi warga yang sah.',
+      posita_dalil_terkait: 'Posita: Ketiadaan Mens Rea dan Penjaminan Hak Berekspresi Pasal 28F UUD 1945.',
+      syarat_legalisasi: 'Dokumen Pendukung / Kajian Hak Asasi',
+      url_rujukan_pasal_id: 'https://pasal.id/peraturan/putusan-mk/puu-mk-50-2008',
+      frbr_uri: '/akn/id/judgment/puu-mk/2008/50',
       status: 'disarankan',
       created_at: dateNow,
       updated_at: dateNow,
@@ -284,6 +337,8 @@ export function generateDynamicEvidenceMatrix(
       relevansi_hukum: 'Membuktikan adanya kerugian hak konstitusional spesifik, langsung, dan aktual yang diderita oleh Pemohon.',
       posita_dalil_terkait: 'Posita: Kerugian Konstitusional Aktual Pemohon (Syarat 2 dan 3 Kedudukan Hukum).',
       syarat_legalisasi: 'Wajib Legalisasi/Pemeteraian di Kantor Pos (Meterai Tempel Rp10.000 + Cap Pos)',
+      url_rujukan_pasal_id: 'https://pasal.id',
+      frbr_uri: '/akn/id/act/uud/1945/1',
       status: 'disarankan',
       created_at: dateNow,
       updated_at: dateNow,
@@ -299,6 +354,8 @@ export function generateDynamicEvidenceMatrix(
       relevansi_hukum: 'Membuktikan hubungan sebab-akibat langsung (causal verband) antara norma hukum dengan kerugian yang diderita.',
       posita_dalil_terkait: 'Posita: Hubungan Kausalitas (Causal Verband) Syarat 4 Kedudukan Hukum.',
       syarat_legalisasi: 'Wajib Legalisasi/Pemeteraian di Kantor Pos (Meterai Tempel Rp10.000 + Cap Pos)',
+      url_rujukan_pasal_id: 'https://pasal.id',
+      frbr_uri: '/akn/id/judgment/puu-mk/2005/006',
       status: 'disarankan',
       created_at: dateNow,
       updated_at: dateNow,
@@ -314,6 +371,8 @@ export function generateDynamicEvidenceMatrix(
       relevansi_hukum: 'Membuktikan ratio decidendi pertentangan norma terhadap prinsip kepastian hukum yang adil dan pemenuhan asas Ne Bis In Idem.',
       posita_dalil_terkait: 'Posita: Pemenuhan Pasal 60 UU MK & Doktrin Negara Hukum.',
       syarat_legalisasi: 'Dokumen Pendukung / Kajian Yurisprudensi',
+      url_rujukan_pasal_id: 'https://pasal.id',
+      frbr_uri: '/akn/id/act/uu/2003/24',
       status: 'disarankan',
       created_at: dateNow,
       updated_at: dateNow,

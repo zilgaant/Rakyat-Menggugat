@@ -140,7 +140,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5">
                     <Lock className="w-4 h-4 text-emerald-700" />
-                    <span className="text-sm">Mode Anonim</span>
+                    <span className="text-sm">Anonim</span>
                   </div>
                   {authMode === 'anonim_pseudonim' && <Check className="w-4 h-4 text-[#881337]" />}
                 </div>

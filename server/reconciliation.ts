@@ -20,6 +20,8 @@ export interface ReconciledAssessmentResult {
   case_id: string;
   agent_analysis_run_id: string;
   agent_verifier_run_id: string;
+  model_used_analysis?: string;
+  model_used_verifier?: string;
   hasil_akhir: 'layak' | 'perlu_data_tambahan' | 'tidak_layak';
   confidence_level: 'tinggi' | 'sedang' | 'rendah';
   agent_agreement: boolean;
@@ -175,6 +177,17 @@ export function reconcileAssessment(
     statusTampil = 'memerlukan_konsultasi_manusia';
   }
 
+  const isDeterministicFallback = 
+    agent2.model_used === 'deterministic-rules-engine' || 
+    agent3.model_used === 'deterministic-adversarial-verifier' ||
+    !agent2.model_used ||
+    !agent3.model_used;
+
+  // If deterministic engine is used without full AI reasoning, confidence is strictly forced to 'rendah' (rank 1)
+  if (isDeterministicFallback) {
+    computedConfidenceRank = 1;
+  }
+
   const confidenceLevel = rankToConfidence[computedConfidenceRank] || 'sedang';
 
   const catatanKetidaksesuaian = discrepancies.length > 0 ? discrepancies.join('; ') : null;
@@ -197,11 +210,17 @@ export function reconcileAssessment(
     summary = `Asesmen menunjukkan permohonan saat ini berisiko tidak memenuhi syarat kompetensi atau kedudukan hukum formil. Silakan tinjau kembali objek gugatan dan rujukan pasal perundang-undangan.`;
   }
 
+  if (isDeterministicFallback) {
+    summary += ' [Catatan Sistem: Asesmen ini dihitung menggunakan mesin aturan deterministik cadangan karena keterbatasan jaringan AI. Tingkat keyakinan ditandai "rendah" dan disarankan penelaahan manual.]';
+  }
+
   return {
     id: assessmentId,
     case_id: caseId,
     agent_analysis_run_id: agent2.agent_run_id,
     agent_verifier_run_id: agent3.agent_run_id,
+    model_used_analysis: agent2.model_used,
+    model_used_verifier: agent3.model_used,
     hasil_akhir: hasilAkhir,
     confidence_level: confidenceLevel,
     agent_agreement: agentAgreement,

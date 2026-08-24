@@ -77,10 +77,10 @@ export const AccountPrivacyView: React.FC<AccountPrivacyViewProps> = ({
           </div>
           <div>
             <h1 className="font-serif text-2xl sm:text-3xl font-bold text-stone-900">
-              Pengaturan Akun & Pelindungan Data Pribadi
+              Privasi
             </h1>
             <p className="text-xs sm:text-sm text-stone-600 mt-0.5">
-              Kepatuhan UU No. 27/2022 tentang Pelindungan Data Pribadi (UU PDP)
+              Pengaturan Akun & Pelindungan Data Pribadi (Kepatuhan UU No. 27/2022 tentang Pelindungan Data Pribadi)
             </p>
           </div>
         </div>
@@ -155,6 +155,42 @@ export const AccountPrivacyView: React.FC<AccountPrivacyViewProps> = ({
         <p className="leading-relaxed">
           Seluruh data kasus dan dokumen Anda disimpan secara aman pada infrastruktur cloud region Jakarta (<code>asia-southeast2</code>) dengan enkripsi <em>at-rest</em> (AES-256) dan <em>in-transit</em> (TLS 1.3). Kami tidak menjual data Anda kepada pihak ketiga manapun untuk kepentingan komersial.
         </p>
+      </div>
+
+      {/* Bagian 8: Pemroses Data Pihak Ketiga & Mesin Pencari Hukum (Pasal.id & Model AI) */}
+      <div className="bg-white border border-stone-300 rounded-lg p-6 space-y-4 shadow-xs text-xs text-stone-800">
+        <div className="flex items-center gap-2 text-stone-900 font-bold font-serif text-sm border-b border-stone-200 pb-3">
+          <Lock className="w-4 h-4 text-rose-900" />
+          <span>Kebijakan Transparansi: Pemroses Data Pihak Ketiga (Pasal.id & Gemini AI)</span>
+        </div>
+        <div className="space-y-3 text-xs leading-relaxed text-stone-700">
+          <p>
+            Sesuai prinsip kejujuran dan keterbukaan UU No. 27/2022 tentang Pelindungan Data Pribadi (UU PDP), platform <strong>Rakyat Menggugat</strong> menggunakan integrasi pihak ketiga berikut secara terbatas dan terenkripsi:
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+            <div className="p-3.5 bg-stone-50 rounded border border-stone-200 space-y-1.5">
+              <span className="font-bold text-stone-900 block flex items-center gap-1.5">
+                <FileText className="w-3.5 h-3.5 text-rose-900" />
+                1. API & MCP Server Pasal.id
+              </span>
+              <p className="text-stone-600 text-xs leading-normal">
+                Digunakan untuk pencarian naskah publik peraturan perundang-undangan (187.000+ UU/PP/Perpres) dan putusan presedensi Mahkamah Konstitusi. Transmisi ke Pasal.id murni berupa <em>query kata kunci hukum</em> (tanpa data identitas pribadi, NIK, atau nama pemohon).
+              </p>
+            </div>
+            <div className="p-3.5 bg-stone-50 rounded border border-stone-200 space-y-1.5">
+              <span className="font-bold text-stone-900 block flex items-center gap-1.5">
+                <Shield className="w-3.5 h-3.5 text-rose-900" />
+                2. Model AI Gemini (Google Cloud)
+              </span>
+              <p className="text-stone-600 text-xs leading-normal">
+                Digunakan untuk penalaran hukum 4-lapis independen (Agent 2 & Agent 3). Pemrosesan teks fakta kasus dilakukan tanpa retensi permanen untuk pelatihan model publik.
+              </p>
+            </div>
+          </div>
+          <p className="text-stone-500 italic text-[11px] pt-1">
+            * Seluruh kutipan norma hukum dan presedensi yang ditarik melalui Pasal.id disimpan dalam bentuk snapshot permanen berstempel waktu di database kami untuk menjaga audit trail yang tidak dapat diubah (immutable).
+          </p>
+        </div>
       </div>
 
       {/* Right to Erasure & Data Actions (PRD Section 17) */}

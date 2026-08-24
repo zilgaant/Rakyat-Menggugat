@@ -50,15 +50,15 @@ export interface LiveScrapedLegalDoc {
 export async function fetchAndParseRobotsTxt(
   baseUrl: string,
   userAgent: string = CIVIC_USER_AGENT,
-  timeoutMs: number = 5000
+  timeoutMs: number = 6000
 ): Promise<ParsedRobotsTxt> {
   const robotsUrl = `${baseUrl.replace(/\/$/, '')}/robots.txt`;
   const fetchedAt = new Date().toISOString();
 
-  try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
 
+  try {
     const response = await fetch(robotsUrl, {
       method: 'GET',
       headers: {
@@ -70,16 +70,19 @@ export async function fetchAndParseRobotsTxt(
     clearTimeout(timer);
 
     if (!response.ok) {
-      // If 404 or not found, robots.txt permits all crawling by convention
-      return {
-        crawlDelaySeconds: 1,
-        disallowedPaths: [],
-        allowedPaths: ['/'],
-        rawText: `HTTP ${response.status}: Defaulting to permissive rules`,
-        sourceUrl: robotsUrl,
-        fetchedAt,
-        isMockFallback: false
-      };
+      if (response.status === 404) {
+        // RFC 9309: HTTP 404 implies no robots.txt restriction exists
+        return {
+          crawlDelaySeconds: 2,
+          disallowedPaths: [],
+          allowedPaths: ['/'],
+          rawText: `HTTP 404: robots.txt not found on server (permissive access)`,
+          sourceUrl: robotsUrl,
+          fetchedAt,
+          isMockFallback: false
+        };
+      }
+      throw new Error(`HTTP ${response.status} ${response.statusText} saat mengakses ${robotsUrl}`);
     }
 
     const rawText = await response.text();
@@ -93,16 +96,9 @@ export async function fetchAndParseRobotsTxt(
       isMockFallback: false
     };
   } catch (err: any) {
-    // Network / timeout failure (e.g. offline sandbox or blocked egress)
-    return {
-      crawlDelaySeconds: 1,
-      disallowedPaths: ['/admin/', '/private/'],
-      allowedPaths: ['/putusan/', '/dokumen/', '/peraturan/'],
-      rawText: `Fallback due to fetch error (${err.message}): standard permissive policy assumed`,
-      sourceUrl: robotsUrl,
-      fetchedAt,
-      isMockFallback: true
-    };
+    clearTimeout(timer);
+    // Mandatory Rule: If robots.txt cannot be verified, abort entire run rather than assume permission
+    throw new Error(`Gagal memverifikasi robots.txt dari ${robotsUrl}: ${err.message}. Sinkronisasi dihentikan.`);
   }
 }
 
@@ -154,13 +150,52 @@ export function parseRobotsTxtContent(
 }
 
 /**
- * Checks if a specific path is allowed according to parsed rules
+ * Application-level Defense-in-Depth Hard Exclude Patterns
+ * Paths containing these patterns are unconditionally rejected regardless of robots.txt.
+ */
+export const HARD_EXCLUDED_PATH_PATTERNS: string[] = [
+  '/admin',
+  '/login',
+  '/signin',
+  '/logout',
+  '/wp-admin',
+  '/wp-login',
+  '/auth',
+  '/dashboard',
+  '/private',
+  '/internal',
+  '/api/internal',
+  '/cpanel',
+  '/user/login'
+];
+
+/**
+ * Checks if a path matches the application-level defense-in-depth hard exclude list
+ */
+export function isPathHardExcluded(path: string): { isExcluded: boolean; matchedPattern?: string } {
+  const normalized = path.toLowerCase();
+  for (const pattern of HARD_EXCLUDED_PATH_PATTERNS) {
+    if (normalized.includes(pattern)) {
+      return { isExcluded: true, matchedPattern: pattern };
+    }
+  }
+  return { isExcluded: false };
+}
+
+/**
+ * Checks if a specific path is allowed according to parsed rules and defense-in-depth hard exclusion
  */
 export function isPathAllowed(path: string, disallowedPaths: string[], allowedPaths: string[]): boolean {
-  // Explicit allow overrides disallow
+  // Layer 1: Application-level hard exclusion (Defense-in-depth)
+  if (isPathHardExcluded(path).isExcluded) {
+    return false;
+  }
+
+  // Layer 2: Explicit allow overrides robots.txt disallow
   for (const allowPath of allowedPaths) {
     if (path.startsWith(allowPath)) return true;
   }
+  // Layer 3: Robots.txt disallow directives
   for (const disallowPath of disallowedPaths) {
     if (path.startsWith(disallowPath)) return false;
   }
@@ -196,13 +231,23 @@ export async function fetchLiveLegalPage(
     });
     clearTimeout(timer);
 
-    const html = await response.text();
     const durationMs = Date.now() - startTime;
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status} ${response.statusText} dari ${url} (kemungkinan WAF/Cloudflare bot challenge)`);
+    }
+
+    const html = await response.text();
+
+    // Check if HTML is a Cloudflare / Bot challenge page
+    if (html.includes('Just a moment...') || html.includes('cf-browser-verification') || html.includes('challenge-platform')) {
+      throw new Error(`Deteksi Cloudflare Bot Management Challenge pada ${url} (memerlukan bypass/browser headers)`);
+    }
+
     return { html, status: response.status, durationMs };
   } catch (err: any) {
     clearTimeout(timer);
     const durationMs = Date.now() - startTime;
-    throw new Error(`Gagal menghubungi server ${url}: ${err.message} (${durationMs}ms)`);
+    throw new Error(`Gagal mengambil ${url}: ${err.message} (${durationMs}ms)`);
   }
 }
 

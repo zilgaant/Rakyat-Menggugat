@@ -78,28 +78,22 @@ export const firestoreService = {
   async deleteCase(caseId: string): Promise<void> {
     try {
       // Delete subcollections: messages, evidence_items, assessments, generated_documents, consents, statement_form
-      const msgsSnap = await getDocs(collection(db, 'cases', caseId, 'messages'));
-      msgsSnap.forEach(d => deleteDoc(d.ref));
-
-      const evSnap = await getDocs(collection(db, 'cases', caseId, 'evidence_items'));
-      evSnap.forEach(d => deleteDoc(d.ref));
-
-      const asmSnap = await getDocs(collection(db, 'cases', caseId, 'assessments'));
-      asmSnap.forEach(d => deleteDoc(d.ref));
-
-      const docSnap = await getDocs(collection(db, 'cases', caseId, 'generated_documents'));
-      docSnap.forEach(d => deleteDoc(d.ref));
-
-      const consentSnap = await getDocs(collection(db, 'cases', caseId, 'consents'));
-      consentSnap.forEach(d => deleteDoc(d.ref));
-
-      const formSnap = await getDocs(collection(db, 'cases', caseId, 'statement_form'));
-      formSnap.forEach(d => deleteDoc(d.ref));
+      const collections = ['messages', 'evidence_items', 'assessments', 'generated_documents', 'consents', 'statement_form'];
+      
+      await Promise.all(collections.map(async (colName) => {
+        try {
+          const snap = await getDocs(collection(db, 'cases', caseId, colName));
+          await Promise.all(snap.docs.map(d => deleteDoc(d.ref)));
+        } catch (subErr) {
+          console.warn(`Firestore subcollection ${colName} deletion non-blocking notice:`, subErr);
+        }
+      }));
 
       // Delete parent case document
       await deleteDoc(doc(db, 'cases', caseId));
     } catch (err) {
       console.warn('Firestore deleteCase error:', err);
+      throw err;
     }
   },
 

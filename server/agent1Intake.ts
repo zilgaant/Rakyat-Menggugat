@@ -6,7 +6,7 @@
  * Conducts structured intake, clarifies constitutional injury, supports Javanese & Sundanese.
  */
 
-import { GoogleGenAI } from '@google/genai';
+import { generateGeminiContentWithRetry } from './geminiHelper';
 
 export interface SubstantiveElements {
   latar_belakang_fakta: string;
@@ -34,7 +34,6 @@ export async function runAgent1Intake(
 
   if (apiKey) {
     try {
-      const ai = new GoogleGenAI({ apiKey });
       const prompt = `Anda adalah Agen 1 (Intake & Klarifikasi Fakta) pada platform Rakyat Menggugat.
 Tugas Anda adalah memandu warga negara Indonesia dalam menguraikan masalah hukum yang mereka hadapi:
 1. Memahami keluhan warga baik dalam Bahasa Indonesia, Bahasa Jawa (Ngoko maupun Krama), atau Bahasa Sunda (Loma maupun Lemes).
@@ -47,7 +46,7 @@ Tugas Anda adalah memandu warga negara Indonesia dalam menguraikan masalah hukum
    ATURAN MUTLAK ANTI-ANCHORING & ANTI-HALUSINASI:
    - DILARANG KERAS mencantumkan nomor pasal UUD 1945 spesifik (misal: "Pasal 27 ayat 2", "Pasal 28D ayat 2", "Pasal 18B", "Pasal 28H", dll) di dalam formal_indonesian_paraphrase.
    - Penentuan pasal batu uji UUD 1945 adalah wewenang eksklusif Agen 2 (melalui RAG retrieval korpus hukum) dan Agen 3 (Verifikator independen). Agen 1 HANYA berfokus pada fakta dan kerugian riil.
-4. Memberikan pesan balasan ("message") yang ramah, santun, dan sesuai bahasa/register pengguna (Bahasa Indonesia, Jawa Krama/Ngoko, atau Sunda Lemes/Loma).
+4. Memberikan pesan balasan ("message") yang ramah, santun, dan sesuai bahasa/register pengguna (Bahasa Indonesia, Jawa Krama/Ngoko, atau Sunda Lemes/Loma). Beri tahu warga bahwa mereka dapat menekan tombol "Lakukan Uji Kelayakan" untuk langsung memeriksa peluang gugatannya.
 
 Riwayat Percakapan:
 ${chatHistory.map(m => `${m.role.toUpperCase()}: ${m.content}`).join('\n')}
@@ -73,22 +72,20 @@ Keluarkan HANYA JSON murni dengan skema:
   }
 }`;
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-3.7-flash',
-        contents: prompt,
+      const { text } = await generateGeminiContentWithRetry(prompt, {
+        preferredModel: 'gemini-3.7-flash',
         config: {
           responseMimeType: 'application/json',
           temperature: 0.2,
         }
       });
 
-      const text = response.text || '';
       const parsed = JSON.parse(text);
       return {
         message: parsed.message,
         formal_indonesian_paraphrase: parsed.formal_indonesian_paraphrase || caseFacts,
         identified_complaint_summary: parsed.identified_complaint_summary,
-        suggested_next_action: parsed.suggested_next_action || 'continue_chat',
+        suggested_next_action: parsed.suggested_next_action || 'ready_for_assessment',
         detected_potential_norm: parsed.detected_potential_norm,
         detected_language_register: parsed.detected_language_register || (language as any),
         substantive_elements_extracted: parsed.substantive_elements_extracted
@@ -125,19 +122,19 @@ function generateDeterministicIntakeResponse(caseFacts: string, language: string
 
   if (isJvKrama || (language === 'jv' && !isJvNgoko)) {
     detectedRegister = 'jv_krama';
-    responseMessage = 'Matur nuwun sanget kagem katrangan panjenengan. Sistem sampun nyathet sedaya fakta perkawis saha kerugian ingkang dipun raosaken. Panjenengan saged mencet tombol "Lakukan Asesmen Kelayakan Dual-Agent" kagem nindakaken evaluasi yuridis 4 lapis dening kalih agen mandiri.';
+    responseMessage = 'Matur nuwun sanget kagem katrangan panjenengan. Sistem sampun nyathet sedaya fakta perkawis saha kerugian ingkang dipun raosaken. Panjenengan saged mencet tombol "Lakukan Uji Kelayakan" ing ngandhap kagem nindakaken evaluasi yuridis 4 lapis dening kalih agen mandiri.';
   } else if (isJvNgoko) {
     detectedRegister = 'jv_ngoko';
-    responseMessage = 'Matur suwun wis nyritakake masalahmu kanthi cetha. Sistem wis nyathet kabeh fakta lan kerugian sing kok alami. Saiki kowe bisa ngeklik tombol "Lakukan Asesmen Kelayakan Dual-Agent" ing sisih tengen kanggo mriksa kelayakan gugatan menyang Mahkamah Konstitusi.';
+    responseMessage = 'Matur suwun wis nyritakake masalahmu kanthi cetha. Sistem wis nyathet kabeh fakta lan kerugian sing kok alami. Saiki kowe bisa ngeklik tombol "Lakukan Uji Kelayakan" ing ngisor iki kanggo mriksa kelayakan gugatan menyang Mahkamah Konstitusi.';
   } else if (isSuLemes || (language === 'su' && !isSuLoma)) {
     detectedRegister = 'su_lemes';
-    responseMessage = 'Hatur nuhun kana katerangan salira anu parantos écés. Sistem parantos nyatet sadaya fakta sareng karugian anu karandapan. Salira tiasa mencet tombol "Lakukan Asesmen Kelayakan Dual-Agent" kanggo mariksa kalayakan gugatan ka Mahkamah Konstitusi.';
+    responseMessage = 'Hatur nuhun kana katerangan salira anu parantos écés. Sistem parantos nyatet sadaya fakta sareng karugian anu karandapan. Salira tiasa mencet tombol "Lakukan Uji Kelayakan" di handap kanggo mariksa kalayakan gugatan ka Mahkamah Konstitusi.';
   } else if (isSuLoma) {
     detectedRegister = 'su_loma';
-    responseMessage = 'Nuhun geus nyaritakeun masalahna. Sistem geus nyatet fakta jeung karugian anu karasa ku anjeun. Mangga klik tombol "Lakukan Asesmen Kelayakan Dual-Agent" di beulah katuhu pikeun mariksa kelayakan perkara ka Mahkamah Konstitusi.';
+    responseMessage = 'Nuhun geus nyaritakeun masalahna. Sistem geus nyatet fakta jeung karugian anu karasa ku anjeun. Mangga klik tombol "Lakukan Uji Kelayakan" di handap pikeun mariksa kelayakan perkara ka Mahkamah Konstitusi.';
   } else {
     detectedRegister = 'id';
-    responseMessage = 'Poin fakta telah dicatat secara sistematis. Dari uraian Anda, objek yang dipersoalkan berkaitan dengan potensi kerugian hak warga negara. Silakan klik tombol "Lakukan Asesmen Kelayakan Dual-Agent" di bilah kanan untuk menjalankan evaluasi independen 4 lapis secara otomatis.';
+    responseMessage = 'Poin fakta telah dicatat secara sistematis. Dari uraian Anda, objek yang dipersoalkan berkaitan dengan potensi kerugian hak warga negara. Silakan klik tombol "Lakukan Uji Kelayakan" di bawah untuk menjalankan evaluasi independen 4 lapis secara otomatis.';
   }
 
   // Detect specific issue scenarios (purely descriptive facts - NO constitutional article numbers)

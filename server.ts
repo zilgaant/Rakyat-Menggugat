@@ -22,6 +22,14 @@ import {
   getEntryVersions,
   getSyncJobHistory
 } from './server/legalKnowledgeETL';
+import { runJdihMkCrawlOrchestrator } from './server/jdihMkCrawlerOrchestrator';
+import {
+  searchPasalIdCourtDecisions,
+  searchPasalIdLawsRest,
+  searchPasalIdFull,
+  resolvePasalIdLaw,
+  readPasalIdLaw
+} from './server/pasalIdClient';
 
 async function startServer() {
   const app = express();
@@ -71,6 +79,22 @@ async function startServer() {
     }
   });
 
+  // --- JDIH MK LIVE CRAWLING ORCHESTRATOR (MANUAL DRY RUN & VERIFICATION) ---
+  app.post('/api/legal-knowledge/crawl-mk', async (req, res) => {
+    try {
+      const { targetUrls, minDelayMs = 2000, dryRunLabel } = req.body;
+      const result = await runJdihMkCrawlOrchestrator({
+        targetUrls,
+        minDelayMs,
+        dryRunLabel: dryRunLabel || 'API Manual Trigger'
+      });
+      res.json({ result });
+    } catch (err: any) {
+      console.error('API /api/legal-knowledge/crawl-mk error:', err);
+      res.status(500).json({ error: err.message || 'JDIH MK crawl orchestration failed' });
+    }
+  });
+
   app.get('/api/legal-knowledge/sync-history', (req, res) => {
     try {
       const history = getSyncJobHistory();
@@ -92,6 +116,81 @@ async function startServer() {
     } catch (err: any) {
       console.error('API /api/legal-knowledge/search error:', err);
       res.status(500).json({ error: err.message || 'Legal search failed' });
+    }
+  });
+
+  // --- PASAL.ID LEGAL CORPUS & PRECEDENT LOOKUP APIS ---
+  app.get('/api/pasal-id/search-full', async (req, res) => {
+    try {
+      const query = (req.query.q as string) || '';
+      if (!query) {
+        return res.status(400).json({ error: 'Query pencarian naskah hukum & putusan MK wajib diisi' });
+      }
+      const limitLaws = req.query.limitLaws ? parseInt(req.query.limitLaws as string, 10) : 4;
+      const limitDecisions = req.query.limitDecisions ? parseInt(req.query.limitDecisions as string, 10) : 4;
+      const result = await searchPasalIdFull(query, { limitLaws, limitDecisions });
+      res.json(result);
+    } catch (err: any) {
+      console.error('API /api/pasal-id/search-full error:', err);
+      res.status(500).json({ error: err.message || 'Pasal.id unified search failed' });
+    }
+  });
+
+  app.get('/api/pasal-id/decisions', async (req, res) => {
+    try {
+      const query = (req.query.q as string) || 'Pengujian Undang-Undang';
+      const reviewedLaw = req.query.reviewed_law as string | undefined;
+      const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 10;
+      const decisions = await searchPasalIdCourtDecisions(query, {
+        reviewed_law: reviewedLaw,
+        limit
+      });
+      res.json({ query, decisions });
+    } catch (err: any) {
+      console.error('API /api/pasal-id/decisions error:', err);
+      res.status(500).json({ error: err.message || 'Pasal.id decisions search failed' });
+    }
+  });
+
+  app.get('/api/pasal-id/laws', async (req, res) => {
+    try {
+      const query = (req.query.q as string) || '';
+      if (!query) {
+        return res.status(400).json({ error: 'Query pencarian UU wajib diisi' });
+      }
+      const results = await searchPasalIdLawsRest(query);
+      res.json({ query, results });
+    } catch (err: any) {
+      console.error('API /api/pasal-id/laws error:', err);
+      res.status(500).json({ error: err.message || 'Pasal.id laws search failed' });
+    }
+  });
+
+  app.post('/api/pasal-id/resolve', async (req, res) => {
+    try {
+      const { reference } = req.body;
+      if (!reference) {
+        return res.status(400).json({ error: 'Parameter reference wajib diisi' });
+      }
+      const result = await resolvePasalIdLaw(reference);
+      res.json({ reference, result });
+    } catch (err: any) {
+      console.error('API /api/pasal-id/resolve error:', err);
+      res.status(500).json({ error: err.message || 'Pasal.id resolve law failed' });
+    }
+  });
+
+  app.post('/api/pasal-id/read', async (req, res) => {
+    try {
+      const { law, selector = 'all' } = req.body;
+      if (!law) {
+        return res.status(400).json({ error: 'Parameter law identifier wajib diisi' });
+      }
+      const result = await readPasalIdLaw(law, selector);
+      res.json({ law, selector, result });
+    } catch (err: any) {
+      console.error('API /api/pasal-id/read error:', err);
+      res.status(500).json({ error: err.message || 'Pasal.id read law failed' });
     }
   });
 

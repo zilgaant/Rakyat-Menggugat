@@ -4,5 +4,26 @@ dist/
 coverage/
 .DS_Store
 *.log
-.env*
+
+# Environment and Secret configs
+.env
+.env.*
+.env.local
 !.env.example
+
+# Firebase local credentials & applet config (prevents GitHub Secret Scanner block)
+firebase-applet-config.json
+!firebase-applet-config.example.json
+
+# Agent & AI instruction files (private directives, rules, prompt context)
+AGENTS.md
+AGENT.md
+AGENTS_*.md
+GEMINI.md
+CLAUDE.md
+.agents/
+.agent/
+UX_OVERHAUL_LOG.md
+*_OVERHAUL_LOG.md
+*.prompt.md
+

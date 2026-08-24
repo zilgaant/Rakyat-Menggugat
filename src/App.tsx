@@ -84,6 +84,7 @@ export default function App() {
 
   const [activeCaseId, setActiveCaseId] = useState<string>('case-demo-001');
   const [isAssessing, setIsAssessing] = useState(false);
+  const [isAgentTyping, setIsAgentTyping] = useState(false);
 
   // Case messages store
   const [caseMessages, setCaseMessages] = useState<Record<string, CaseMessage[]>>({
@@ -405,6 +406,9 @@ export default function App() {
     }));
     firestoreService.saveMessage(newMsg);
 
+    // Trigger typing indicator for Agent 1
+    setIsAgentTyping(true);
+
     // Call Agent 1 Intake API
     try {
       const response = await fetch('/api/agent-intake', {
@@ -417,7 +421,7 @@ export default function App() {
         })
       });
 
-      let botContent = 'Poin fakta telah dicatat. Dari uraian Anda: objek yang dipersoalkan berkaitan dengan kerugian hak konstitusional. Anda dapat menekan tombol "Lakukan Asesmen Kelayakan Dual-Agent" di sebelah kanan untuk menjalankan evaluasi independen 4 lapis.';
+      let botContent = 'Poin fakta telah dicatat secara sistematis. Dari uraian Anda, objek yang dipersoalkan berkaitan dengan potensi kerugian hak warga negara. Silakan klik tombol "Lakukan Uji Kelayakan" di bawah untuk menjalankan evaluasi independen 4 lapis secara otomatis.';
       let formalParaphrase = updatedSummary;
 
       if (response.ok) {
@@ -457,7 +461,7 @@ export default function App() {
         id: botMsgId,
         case_id: activeCase.id,
         role: 'agent_intake',
-        content: 'Poin fakta telah dicatat. Dari uraian Anda: objek yang dipersoalkan berkaitan dengan kerugian langsung hak konstitusional. Anda dapat menekan tombol "Lakukan Asesmen Kelayakan Dual-Agent" di sebelah kanan untuk menganalisis 4 lapis kelayakan secara komprehensif.',
+        content: 'Poin fakta telah dicatat secara sistematis. Dari uraian Anda, objek yang dipersoalkan berkaitan dengan potensi kerugian hak warga negara. Silakan klik tombol "Lakukan Uji Kelayakan" di bawah untuk menjalankan evaluasi independen 4 lapis secara otomatis.',
         created_at: new Date().toISOString(),
       };
       setCaseMessages(prev => ({
@@ -465,6 +469,8 @@ export default function App() {
         [activeCase.id]: [...updatedHistory, fallbackResponse]
       }));
       firestoreService.saveMessage(fallbackResponse);
+    } finally {
+      setIsAgentTyping(false);
     }
   };
 
@@ -700,6 +706,27 @@ export default function App() {
     }
   };
 
+  const handleRetryFailedCaseAndStartNew = async (failedCaseId: string) => {
+    // 1. Soft-close failed case: mark status as 'closed' and preserve in Firestore for agreement rate metrics & audit trail
+    const failedCase = cases.find(c => c.id === failedCaseId);
+    if (failedCase) {
+      const closedCase: CaseRecord = {
+        ...failedCase,
+        status: 'closed',
+        updated_at: new Date().toISOString()
+      };
+      setCases(prev => prev.map(c => c.id === failedCaseId ? closedCase : c));
+      try {
+        await firestoreService.saveCase(closedCase);
+      } catch (err) {
+        console.warn('Error soft-closing failed case:', err);
+      }
+    }
+
+    // 2. Start a fresh new case
+    handleStartNewCase();
+  };
+
   const handleSaveStatement = (type: StatementType, lawyerName?: string, lawyerNumber?: string) => {
     if (!activeCase) return;
     const updatedCase: CaseRecord = {
@@ -711,16 +738,45 @@ export default function App() {
     firestoreService.saveCase(updatedCase);
   };
 
-  const handleDeleteCase = (caseId: string) => {
-    setCases(prev => prev.filter(c => c.id !== caseId));
-    firestoreService.deleteCase(caseId);
+  const handleDeleteCase = async (caseId: string) => {
+    // 1. Update state immediately
+    const remaining = cases.filter(c => c.id !== caseId);
+    setCases(remaining);
+    localStorage.setItem('rm_cases_data', JSON.stringify(remaining));
+
+    // 2. Clean up associated memory states
+    setCaseMessages(prev => {
+      const next = { ...prev };
+      delete next[caseId];
+      return next;
+    });
+    setCaseAssessments(prev => {
+      const next = { ...prev };
+      delete next[caseId];
+      return next;
+    });
+    setCaseEvidence(prev => {
+      const next = { ...prev };
+      delete next[caseId];
+      return next;
+    });
+
+    // 3. Switch active case pointer if needed
     if (activeCaseId === caseId) {
-      const remaining = cases.filter(c => c.id !== caseId);
       if (remaining.length > 0) {
         setActiveCaseId(remaining[0].id);
       } else {
-        setCurrentScreen('home');
+        setActiveCaseId('');
       }
+    }
+
+    // 4. Delete from Firestore
+    try {
+      await firestoreService.deleteCase(caseId);
+      showToast('Permohonan kasus berhasil dihapus dari penyimpanan.', 'success');
+    } catch (err) {
+      console.warn('Firestore deletion error:', err);
+      showToast('Kasus dihapus dari perangkat lokal.', 'info');
     }
   };
 
@@ -820,6 +876,7 @@ export default function App() {
             onSendMessage={handleSendMessage}
             onRunAssessment={handleRunAssessment}
             isAssessing={isAssessing}
+            isAgentTyping={isAgentTyping}
             onAcceptCaseDisclaimer={handleAcceptCaseDisclaimer}
           />
         )}
@@ -828,8 +885,15 @@ export default function App() {
           <AssessmentReportView
             assessment={currentAssessment}
             activeCase={activeCase}
-            onProceedToEvidence={() => setCurrentScreen('evidence')}
-            onBackToChat={() => setCurrentScreen('chat')}
+            onProceedToEvidence={() => {
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+              setCurrentScreen('evidence');
+            }}
+            onBackToChat={() => {
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+              setCurrentScreen('chat');
+            }}
+            onRetryAndStartNewCase={() => handleRetryFailedCaseAndStartNew(activeCase.id)}
           />
         )}
 
@@ -837,12 +901,19 @@ export default function App() {
           <EvidenceGuideView
             activeCase={activeCase}
             evidenceItems={currentEvidence}
+            assessment={currentAssessment}
             sectorName={activeCase.judul_singkat}
             onUpdateEvidenceItem={handleUpdateEvidenceItem}
             onDeleteEvidenceItem={handleDeleteEvidenceItem}
             onAddCustomEvidence={handleAddCustomEvidence}
-            onProceedToDocument={() => setCurrentScreen('document')}
-            onBackToAssessment={() => setCurrentScreen('assessment')}
+            onProceedToDocument={() => {
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+              setCurrentScreen('document');
+            }}
+            onBackToAssessment={() => {
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+              setCurrentScreen('assessment');
+            }}
           />
         )}
 
@@ -852,7 +923,10 @@ export default function App() {
             currentUser={currentUser}
             assessment={currentAssessment}
             evidenceItems={currentEvidence}
-            onBackToEvidence={() => setCurrentScreen('evidence')}
+            onBackToEvidence={() => {
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+              setCurrentScreen('evidence');
+            }}
             onSaveStatement={handleSaveStatement}
           />
         )}

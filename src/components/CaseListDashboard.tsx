@@ -3,8 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
-import { FolderArchive, Plus, ArrowRight, Clock, FileCheck, AlertCircle, FileText, Scale, ShieldCheck, Settings } from 'lucide-react';
+import React, { useState } from 'react';
+import { FolderArchive, Plus, ArrowRight, Clock, FileCheck, AlertCircle, FileText, Scale, ShieldCheck, Settings, Trash2, X } from 'lucide-react';
 import { CaseRecord, UserProfile } from '../types';
 
 interface CaseListDashboardProps {
@@ -24,6 +24,8 @@ export const CaseListDashboard: React.FC<CaseListDashboardProps> = ({
   onDeleteCase,
   onOpenPrivacy,
 }) => {
+  const [caseToDelete, setCaseToDelete] = useState<CaseRecord | null>(null);
+
   const getStatusBadge = (status: CaseRecord['status']) => {
     switch (status) {
       case 'document_generated':
@@ -48,6 +50,13 @@ export const CaseListDashboard: React.FC<CaseListDashboardProps> = ({
             Draf Percakapan
           </span>
         );
+    }
+  };
+
+  const handleConfirmDelete = () => {
+    if (caseToDelete) {
+      onDeleteCase(caseToDelete.id);
+      setCaseToDelete(null);
     }
   };
 
@@ -78,7 +87,7 @@ export const CaseListDashboard: React.FC<CaseListDashboardProps> = ({
               title="Kelola Privasi & Penghapusan Data"
             >
               <Settings className="w-4 h-4 text-stone-600" />
-              <span>Pengaturan & Privasi (Layar 9)</span>
+              <span>Privasi</span>
             </button>
           )}
 
@@ -158,20 +167,66 @@ export const CaseListDashboard: React.FC<CaseListDashboardProps> = ({
                     <ArrowRight className="w-3.5 h-3.5" />
                   </button>
                   <button
-                    onClick={() => {
-                      if (window.confirm('Hapus draf kasus ini secara permanen dari penyimpanan Anda?')) {
-                        onDeleteCase(item.id);
-                      }
-                    }}
-                    className="text-stone-500 hover:text-rose-700 p-2 rounded hover:bg-rose-50 text-xs transition"
+                    onClick={() => setCaseToDelete(item)}
+                    className="text-stone-500 hover:text-rose-700 p-2 rounded hover:bg-rose-50 text-xs transition flex items-center gap-1"
                     title="Hapus Kasus"
                     aria-label="Hapus Kasus"
                   >
-                    Hapus
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Hapus</span>
                   </button>
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* In-App Confirmation Modal for Deleting Case (Non-blocking & Accessible) */}
+      {caseToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/60 backdrop-blur-xs">
+          <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-2xl border border-stone-200 space-y-5 animate-in fade-in zoom-in duration-150">
+            <div className="flex items-center justify-between pb-3 border-b border-stone-100">
+              <div className="flex items-center gap-2.5 text-rose-800 font-bold">
+                <AlertCircle className="w-5 h-5" />
+                <h3 className="font-serif text-lg font-bold text-stone-900">Konfirmasi Hapus Kasus</h3>
+              </div>
+              <button
+                onClick={() => setCaseToDelete(null)}
+                className="text-stone-400 hover:text-stone-700 p-1 rounded transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-2 text-sm text-stone-700">
+              <p>
+                Apakah Anda yakin ingin menghapus permohonan kasus berikut secara permanen?
+              </p>
+              <div className="p-3 bg-stone-50 border border-stone-200 rounded-lg text-xs space-y-1 font-medium text-stone-900">
+                <p className="font-bold">{caseToDelete.judul_singkat || 'Draf Permohonan Tanpa Judul'}</p>
+                <p className="text-stone-500 font-mono">ID: {caseToDelete.id}</p>
+              </div>
+              <p className="text-xs text-rose-700">
+                Tindakan ini akan menghapus riwayat percakapan dengan AI, matriks bukti, dan draf berkas terkait dari akun/sesi Anda.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                onClick={() => setCaseToDelete(null)}
+                className="px-4 py-2 text-xs font-semibold text-stone-700 hover:text-stone-900 bg-stone-100 hover:bg-stone-200 rounded-md transition"
+              >
+                Batal
+              </button>
+              <button
+                onClick={handleConfirmDelete}
+                className="px-4 py-2 text-xs font-semibold text-white bg-rose-700 hover:bg-rose-800 rounded-md transition flex items-center gap-1.5 shadow-xs"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Ya, Hapus Kasus</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -38,7 +38,7 @@ export const EducationView: React.FC<EducationViewProps> = ({
             onClick={onStartIntake}
             className="bg-[#881337] hover:bg-[#70102e] text-stone-50 px-6 py-3 rounded-md text-base font-semibold transition flex items-center gap-2 shadow-xs border border-[#9F1239]"
           >
-            <span>Mulai Penilaian Kasus Mandiri</span>
+            <span>Mulai Menggugat!</span>
             <ArrowRight className="w-4 h-4" />
           </button>
 
@@ -47,7 +47,7 @@ export const EducationView: React.FC<EducationViewProps> = ({
             className="bg-white hover:bg-stone-100 text-stone-800 px-5 py-3 rounded-md text-base font-medium transition border border-stone-300 flex items-center gap-2"
           >
             <FileText className="w-4 h-4 text-stone-600" />
-            <span>Format Formulir Kosong (Tanpa AI)</span>
+            <span>Formulir Kosong (Tanpa AI)</span>
           </button>
         </div>
       </section>

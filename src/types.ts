@@ -84,6 +84,8 @@ export interface DualAgentAssessment {
   case_id: string;
   agent_analysis_run_id: string;
   agent_verifier_run_id: string;
+  model_used_analysis?: string;
+  model_used_verifier?: string;
   hasil_akhir: AssessmentResultType;
   confidence_level: ConfidenceLevel;
   agent_agreement: boolean;
@@ -111,6 +113,8 @@ export interface EvidenceItem {
   syarat_legalisasi?: string;
   catatan_pengguna?: string;
   status: EvidenceStatus;
+  url_rujukan_pasal_id?: string;
+  frbr_uri?: string;
   created_at: string;
   updated_at?: string;
 }
@@ -230,7 +234,7 @@ export interface LegalKnowledgeVersion {
 
 export interface LegalKnowledgeEntry {
   id: string;
-  sumber: 'jdih_mk' | 'jdihn' | 'jdih_ma' | 'seed_manual';
+  sumber: 'jdih_mk' | 'jdihn' | 'jdih_ma' | 'pasal_id' | 'seed_manual';
   jenis_dokumen: 'uud' | 'uu' | 'pp' | 'pmk' | 'perpres' | 'perda' | 'putusan_mk' | 'putusan_ma';
   nomor: string;
   tahun: string;
@@ -242,12 +246,14 @@ export interface LegalKnowledgeEntry {
   ringkasan_kaidah_hukum?: string;
   total_versions?: number;
   last_synced_at: string;
+  frbr_uri?: string;
+  reader_url?: string;
   created_at?: string;
 }
 
 export interface ETLSyncJobResult {
   job_id: string;
-  sumber: 'jdih_mk' | 'jdihn' | 'jdih_ma' | 'all';
+  sumber: 'jdih_mk' | 'jdihn' | 'jdih_ma' | 'pasal_id' | 'all';
   status: 'sukses' | 'parsial' | 'gagal';
   started_at: string;
   completed_at: string;

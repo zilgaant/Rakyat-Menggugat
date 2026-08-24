@@ -26,7 +26,11 @@ import {
   ExternalLink,
   Sparkles,
   RefreshCw,
-  AlertCircle
+  AlertCircle,
+  HelpCircle,
+  Clock,
+  Layers,
+  FileCheck
 } from 'lucide-react';
 import { 
   CaseRecord, 
@@ -194,7 +198,7 @@ export const DocumentGeneratorView: React.FC<DocumentGeneratorViewProps> = ({
             <button
               onClick={handleDownloadDocx}
               disabled={!statementSigned || isExportingDocx || !petitionDoc}
-              className="bg-stone-100 hover:bg-stone-200 text-stone-800 disabled:opacity-50 border border-stone-300 px-4 py-2.5 rounded-md text-xs font-semibold transition flex items-center gap-2 shadow-xs"
+              className="bg-stone-100 hover:bg-stone-200 text-stone-800 disabled:opacity-50 border border-stone-300 px-4 py-2.5 rounded-md text-xs font-semibold transition flex items-center gap-2 shadow-xs cursor-pointer disabled:cursor-not-allowed"
               title={!statementSigned ? 'Wajib menandatangani pernyataan terlebih dahulu' : 'Unduh berkas Word (.DOCX)'}
             >
               <Download className="w-4 h-4 text-stone-600" />
@@ -204,7 +208,7 @@ export const DocumentGeneratorView: React.FC<DocumentGeneratorViewProps> = ({
             <button
               onClick={handlePrint}
               disabled={!statementSigned || !petitionDoc}
-              className="bg-[#881337] hover:bg-[#70102e] disabled:opacity-50 text-white px-4 py-2.5 rounded-md text-xs font-semibold transition flex items-center gap-2 shadow-xs"
+              className="bg-[#881337] hover:bg-[#70102e] disabled:opacity-50 text-white px-4 py-2.5 rounded-md text-xs font-semibold transition flex items-center gap-2 shadow-xs cursor-pointer disabled:cursor-not-allowed"
               title={!statementSigned ? 'Wajib menandatangani pernyataan terlebih dahulu' : 'Cetak atau simpan sebagai PDF'}
             >
               <Printer className="w-4 h-4" />
@@ -217,7 +221,7 @@ export const DocumentGeneratorView: React.FC<DocumentGeneratorViewProps> = ({
         <div className="flex items-center gap-2 border-b border-stone-200 text-xs">
           <button
             onClick={() => setActiveTab('buku_1_permohonan')}
-            className={`pb-2.5 px-3 font-semibold transition border-b-2 flex items-center gap-1.5 ${
+            className={`pb-2.5 px-3 font-semibold transition border-b-2 flex items-center gap-1.5 cursor-pointer ${
               activeTab === 'buku_1_permohonan'
                 ? 'border-[#881337] text-[#881337]'
                 : 'border-transparent text-stone-600 hover:text-stone-900'
@@ -229,7 +233,7 @@ export const DocumentGeneratorView: React.FC<DocumentGeneratorViewProps> = ({
 
           <button
             onClick={() => setActiveTab('buku_bukti')}
-            className={`pb-2.5 px-3 font-semibold transition border-b-2 flex items-center gap-1.5 ${
+            className={`pb-2.5 px-3 font-semibold transition border-b-2 flex items-center gap-1.5 cursor-pointer ${
               activeTab === 'buku_bukti'
                 ? 'border-[#881337] text-[#881337]'
                 : 'border-transparent text-stone-600 hover:text-stone-900'
@@ -241,7 +245,7 @@ export const DocumentGeneratorView: React.FC<DocumentGeneratorViewProps> = ({
 
           <button
             onClick={() => setActiveTab('panduan_simpel')}
-            className={`pb-2.5 px-3 font-semibold transition border-b-2 flex items-center gap-1.5 ${
+            className={`pb-2.5 px-3 font-semibold transition border-b-2 flex items-center gap-1.5 cursor-pointer ${
               activeTab === 'panduan_simpel'
                 ? 'border-[#881337] text-[#881337]'
                 : 'border-transparent text-stone-600 hover:text-stone-900'
@@ -363,7 +367,7 @@ export const DocumentGeneratorView: React.FC<DocumentGeneratorViewProps> = ({
             <div className="pt-2">
               <button
                 type="submit"
-                className="bg-[#881337] hover:bg-[#70102e] text-white px-5 py-2 rounded text-xs font-semibold transition flex items-center gap-2 shadow-xs"
+                className="bg-[#881337] hover:bg-[#70102e] text-white px-5 py-2 rounded text-xs font-semibold transition flex items-center gap-2 shadow-xs cursor-pointer"
               >
                 <CheckCircle2 className="w-4 h-4" />
                 <span>Tandatangani Pernyataan & Buka Akses Unduh Word/PDF</span>
@@ -381,7 +385,7 @@ export const DocumentGeneratorView: React.FC<DocumentGeneratorViewProps> = ({
           </div>
           <button
             onClick={() => setStatementSigned(false)}
-            className="text-emerald-800 hover:underline font-semibold"
+            className="text-emerald-800 hover:underline font-semibold cursor-pointer"
           >
             Ubah Pernyataan
           </button>
@@ -398,7 +402,7 @@ export const DocumentGeneratorView: React.FC<DocumentGeneratorViewProps> = ({
           {!isEditingIdentity ? (
             <button
               onClick={() => setIsEditingIdentity(true)}
-              className="text-[#881337] hover:underline font-semibold flex items-center gap-1"
+              className="text-[#881337] hover:underline font-semibold flex items-center gap-1 cursor-pointer"
             >
               <Edit3 className="w-3.5 h-3.5" />
               <span>Edit Identitas</span>
@@ -406,7 +410,7 @@ export const DocumentGeneratorView: React.FC<DocumentGeneratorViewProps> = ({
           ) : (
             <button
               onClick={() => setIsEditingIdentity(false)}
-              className="text-stone-500 hover:underline"
+              className="text-stone-500 hover:underline cursor-pointer"
             >
               Batal
             </button>
@@ -490,7 +494,7 @@ export const DocumentGeneratorView: React.FC<DocumentGeneratorViewProps> = ({
             <div className="pt-2 flex justify-end">
               <button
                 type="submit"
-                className="bg-stone-900 hover:bg-stone-800 text-white px-4 py-1.5 rounded text-xs font-semibold flex items-center gap-1.5"
+                className="bg-stone-900 hover:bg-stone-800 text-white px-4 py-1.5 rounded text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
               >
                 <Save className="w-3.5 h-3.5" />
                 <span>Simpan & Perbarui Draf Permohonan</span>
@@ -542,7 +546,7 @@ export const DocumentGeneratorView: React.FC<DocumentGeneratorViewProps> = ({
           </div>
           <button
             onClick={() => fetchPetitionDocument()}
-            className="ml-auto bg-rose-900 text-white px-3 py-1 rounded text-xs hover:bg-rose-800"
+            className="ml-auto bg-rose-900 text-white px-3 py-1 rounded text-xs hover:bg-rose-800 cursor-pointer"
           >
             Coba Lagi
           </button>
@@ -645,9 +649,16 @@ export const DocumentGeneratorView: React.FC<DocumentGeneratorViewProps> = ({
 
               {/* SECTION I: KEWENANGAN MAHKAMAH KONSTITUSI */}
               <div className="space-y-3 pt-4 border-t border-stone-200">
-                <h3 className="font-bold text-base uppercase tracking-wider text-center border-b border-stone-300 pb-1.5">
-                  I. Kewenangan Mahkamah Konstitusi
-                </h3>
+                <div className="flex items-center justify-between border-b border-stone-300 pb-1.5">
+                  <h3 className="font-bold text-base uppercase tracking-wider text-stone-900">
+                    I. Kewenangan Mahkamah Konstitusi
+                  </h3>
+                  {/* Tooltip Penjelasan Simpel */}
+                  <span className="print:hidden text-[11px] font-sans text-stone-500 bg-stone-100 px-2 py-0.5 rounded flex items-center gap-1" title="Bagian ini menjelaskan dasar hukum mengapa Mahkamah Konstitusi berwenang menguji undang-undang ini sesuai UUD 1945">
+                    <HelpCircle className="w-3 h-3 text-stone-400" />
+                    Penjelasan: Landasan wewenang MK
+                  </span>
+                </div>
                 <div className="text-xs sm:text-sm space-y-2 text-stone-800 font-sans leading-relaxed">
                   <ol className="list-decimal pl-5 space-y-1.5">
                     {petitionDoc.kewenangan_mk.dasar_hukum.map((dh, idx) => (
@@ -662,9 +673,16 @@ export const DocumentGeneratorView: React.FC<DocumentGeneratorViewProps> = ({
 
               {/* SECTION II: KEDUDUKAN HUKUM (LEGAL STANDING) */}
               <div className="space-y-3 pt-4 border-t border-stone-200">
-                <h3 className="font-bold text-base uppercase tracking-wider text-center border-b border-stone-300 pb-1.5">
-                  II. Kedudukan Hukum (Legal Standing) Pemohon
-                </h3>
+                <div className="flex items-center justify-between border-b border-stone-300 pb-1.5">
+                  <h3 className="font-bold text-base uppercase tracking-wider text-stone-900">
+                    II. Kedudukan Hukum (Legal Standing) Pemohon
+                  </h3>
+                  {/* Tooltip Penjelasan Simpel */}
+                  <span className="print:hidden text-[11px] font-sans text-stone-500 bg-stone-100 px-2 py-0.5 rounded flex items-center gap-1" title="Bagian ini membuktikan bahwa Anda adalah pihak yang berhak menggugat karena mengalami kerugian nyata atau potensial">
+                    <HelpCircle className="w-3 h-3 text-stone-400" />
+                    Penjelasan: Hak & kerugian pemohon
+                  </span>
+                </div>
                 <div className="text-xs sm:text-sm space-y-3 text-stone-800 font-sans leading-relaxed">
                   <p>
                     Bahwa Pasal 51 ayat (1) UU Mahkamah Konstitusi mengatur bahwa Pemohon adalah pihak yang menganggap hak dan/atau kewenangan konstitusionalnya dirugikan oleh berlakunya undang-undang. Berdasarkan doktrin yurisprudensi tetap Mahkamah Konstitusi (Putusan No. 006/PUU-III/2005), Pemohon telah memenuhi 5 syarat kumulatif kerugian hak konstitusional sebagai berikut:
@@ -696,9 +714,16 @@ export const DocumentGeneratorView: React.FC<DocumentGeneratorViewProps> = ({
 
               {/* SECTION III: POSITA */}
               <div className="space-y-4 pt-4 border-t border-stone-200">
-                <h3 className="font-bold text-base uppercase tracking-wider text-center border-b border-stone-300 pb-1.5">
-                  III. Alasan-Alasan Permohonan (Posita)
-                </h3>
+                <div className="flex items-center justify-between border-b border-stone-300 pb-1.5">
+                  <h3 className="font-bold text-base uppercase tracking-wider text-stone-900">
+                    III. Alasan-Alasan Permohonan (Posita)
+                  </h3>
+                  {/* Tooltip Penjelasan Simpel */}
+                  <span className="print:hidden text-[11px] font-sans text-stone-500 bg-stone-100 px-2 py-0.5 rounded flex items-center gap-1" title="Posita memuat uraian fakta kasus dan pertentangan pasal UU terhadap pasal-pasal UUD 1945">
+                    <HelpCircle className="w-3 h-3 text-stone-400" />
+                    Penjelasan: Alasan & dasar gugatan
+                  </span>
+                </div>
                 <div className="text-xs sm:text-sm space-y-4 text-stone-800 font-sans leading-relaxed">
                   {/* A. Duduk Perkara */}
                   <div>
@@ -751,9 +776,16 @@ export const DocumentGeneratorView: React.FC<DocumentGeneratorViewProps> = ({
 
               {/* SECTION IV: PETITUM */}
               <div className="space-y-3 pt-4 border-t border-stone-200">
-                <h3 className="font-bold text-base uppercase tracking-wider text-center border-b border-stone-300 pb-1.5">
-                  IV. Hal-Hal yang Dimohonkan (Petitum)
-                </h3>
+                <div className="flex items-center justify-between border-b border-stone-300 pb-1.5">
+                  <h3 className="font-bold text-base uppercase tracking-wider text-stone-900">
+                    IV. Hal-Hal yang Dimohonkan (Petitum)
+                  </h3>
+                  {/* Tooltip Penjelasan Simpel */}
+                  <span className="print:hidden text-[11px] font-sans text-stone-500 bg-stone-100 px-2 py-0.5 rounded flex items-center gap-1" title="Petitum adalah poin-poin putusan yang Anda minta kepada Majelis Hakim MK untuk diputuskan">
+                    <HelpCircle className="w-3 h-3 text-stone-400" />
+                    Penjelasan: Permintaan putusan hakim
+                  </span>
+                </div>
                 <div className="text-xs sm:text-sm space-y-3 text-stone-800 font-sans leading-relaxed">
                   <p>
                     Berdasarkan seluruh dalil-dalil hukum, fakta empiris, dan argumentasi konstitusional yang telah diuraikan di atas, Pemohon memohon kepada Yang Mulia Majelis Hakim Mahkamah Konstitusi Republik Indonesia berkenan memeriksa dan menjatuhkan putusan sebagai berikut:
@@ -925,11 +957,89 @@ export const DocumentGeneratorView: React.FC<DocumentGeneratorViewProps> = ({
         </>
       )}
 
+      {/* POIN 10: "Yang Harus Anda Lakukan Setelah Dokumen Siap" (Timeline / Checklist Tindak Lanjut Pasca Generate) */}
+      <div className="print:hidden bg-stone-900 text-white rounded-lg p-6 sm:p-8 space-y-6 shadow-md">
+        <div className="border-b border-stone-800 pb-4">
+          <div className="flex items-center gap-2 text-xs font-bold text-rose-300 uppercase tracking-wider">
+            <Clock className="w-4 h-4" />
+            <span>Tahapan Lanjutan Bagi Warga</span>
+          </div>
+          <h2 className="font-serif text-xl sm:text-2xl font-bold text-white mt-1">
+            Yang Harus Anda Lakukan Setelah Dokumen Siap
+          </h2>
+          <p className="text-xs text-stone-300 mt-1">
+            Ikuti 5 langkah berurutan di bawah ini untuk meresmikan berkas permohonan hingga masuk ke sidang Mahkamah Konstitusi:
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 text-xs">
+          {/* Step 1 */}
+          <div className="p-4 rounded-lg bg-stone-800/80 border border-stone-700 space-y-2">
+            <div className="w-6 h-6 rounded-full bg-[#881337] text-white flex items-center justify-center font-bold text-xs">
+              1
+            </div>
+            <h4 className="font-bold text-stone-100 text-sm">Unduh File Word (.DOCX)</h4>
+            <p className="text-stone-300 text-[11px] leading-relaxed">
+              Unduh berkas Word untuk mengecek kembali penulisan nama, alamat, serta uraian fakta yang dialami.
+            </p>
+          </div>
+
+          {/* Step 2 */}
+          <div className="p-4 rounded-lg bg-stone-800/80 border border-stone-700 space-y-2">
+            <div className="w-6 h-6 rounded-full bg-[#881337] text-white flex items-center justify-center font-bold text-xs">
+              2
+            </div>
+            <h4 className="font-bold text-stone-100 text-sm">Cetak Rangkap Dokumen</h4>
+            <p className="text-stone-300 text-[11px] leading-relaxed">
+              Cetak Buku I Permohonan dan Buku II Bukti (1 rangkap asli bertanda tangan + salinan fotokopi untuk arsip/jalur PTSP).
+            </p>
+          </div>
+
+          {/* Step 3 */}
+          <div className="p-4 rounded-lg bg-stone-800/80 border border-stone-700 space-y-2">
+            <div className="w-6 h-6 rounded-full bg-[#881337] text-white flex items-center justify-center font-bold text-xs">
+              3
+            </div>
+            <h4 className="font-bold text-stone-100 text-sm">Legalisasi di Kantor Pos</h4>
+            <p className="text-stone-300 text-[11px] leading-relaxed">
+              Bawa fotokopi bukti surat ke Kantor Pos Besar terdekat untuk pemeteraian/cap pos legalisasi alat bukti pengadilan.
+            </p>
+          </div>
+
+          {/* Step 4 */}
+          <div className="p-4 rounded-lg bg-stone-800/80 border border-stone-700 space-y-2">
+            <div className="w-6 h-6 rounded-full bg-[#881337] text-white flex items-center justify-center font-bold text-xs">
+              4
+            </div>
+            <h4 className="font-bold text-stone-100 text-sm">Daftar Akun SIMPEL MK</h4>
+            <p className="text-stone-300 text-[11px] leading-relaxed">
+              Kunjungi portal resmi <strong className="text-rose-300">simpel.mkri.id</strong> dan daftarkan diri Anda sebagai pemohon mandiri tanpa biaya.
+            </p>
+          </div>
+
+          {/* Step 5 */}
+          <div className="p-4 rounded-lg bg-stone-800/80 border border-stone-700 space-y-2">
+            <div className="w-6 h-6 rounded-full bg-[#881337] text-white flex items-center justify-center font-bold text-xs">
+              5
+            </div>
+            <h4 className="font-bold text-stone-100 text-sm">Unggah Dokumen & Pantau</h4>
+            <p className="text-stone-300 text-[11px] leading-relaxed">
+              Unggah berkas Word dan PDF hasil scan, simpan Akta Pengajuan Permohonan Pemohon (AP3), dan tunggu jadwal Sidang Pendahuluan.
+            </p>
+          </div>
+        </div>
+
+        <div className="bg-stone-800/50 p-3 rounded text-[11px] text-stone-400 flex items-center gap-2 border border-stone-700">
+          <FileCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span>Pengajuan permohonan ke Mahkamah Konstitusi RI <strong>100% Bebas Biaya Perkara</strong> (tidak dipungut biaya pendaftaran sidang).</span>
+        </div>
+      </div>
+
       {/* Bottom Navigation */}
       <div className="print:hidden flex items-center justify-between pt-4 border-t border-stone-200">
         <button
           onClick={onBackToEvidence}
-          className="px-5 py-2.5 border border-stone-300 rounded-md text-xs font-semibold text-stone-700 hover:bg-stone-100 transition flex items-center gap-2"
+          className="px-5 py-2.5 border border-stone-300 rounded-md text-xs font-semibold text-stone-700 hover:bg-stone-100 transition flex items-center gap-2 cursor-pointer"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
           <span>Kembali ke Panduan Bukti</span>
@@ -939,7 +1049,7 @@ export const DocumentGeneratorView: React.FC<DocumentGeneratorViewProps> = ({
           <button
             onClick={handleDownloadDocx}
             disabled={!statementSigned || isExportingDocx || !petitionDoc}
-            className="bg-stone-100 hover:bg-stone-200 text-stone-800 disabled:opacity-50 border border-stone-300 px-4 py-2.5 rounded-md text-xs font-semibold transition flex items-center gap-2"
+            className="bg-stone-100 hover:bg-stone-200 text-stone-800 disabled:opacity-50 border border-stone-300 px-4 py-2.5 rounded-md text-xs font-semibold transition flex items-center gap-2 cursor-pointer disabled:cursor-not-allowed"
           >
             <Download className="w-4 h-4" />
             <span>{isExportingDocx ? 'Membuat Word...' : 'Unduh Word (.DOCX)'}</span>
@@ -948,7 +1058,7 @@ export const DocumentGeneratorView: React.FC<DocumentGeneratorViewProps> = ({
           <button
             onClick={handlePrint}
             disabled={!statementSigned || !petitionDoc}
-            className="bg-[#881337] hover:bg-[#70102e] disabled:opacity-50 text-white px-6 py-2.5 rounded-md text-xs font-semibold transition flex items-center gap-2 shadow-xs"
+            className="bg-[#881337] hover:bg-[#70102e] disabled:opacity-50 text-white px-6 py-2.5 rounded-md text-xs font-semibold transition flex items-center gap-2 shadow-xs cursor-pointer disabled:cursor-not-allowed"
           >
             <Printer className="w-4 h-4" />
             <span>Cetak Dokumen Resmi</span>

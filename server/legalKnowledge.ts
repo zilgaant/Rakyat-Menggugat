@@ -8,15 +8,18 @@
 
 export interface LegalKnowledgeItem {
   id: string;
-  sumber: 'jdih_mk' | 'jdihn' | 'jdih_ma' | 'seed_manual';
+  sumber: 'jdih_mk' | 'jdihn' | 'jdih_ma' | 'seed_manual' | 'pasal_id';
   jenis_dokumen: 'uud' | 'uu' | 'pp' | 'pmk' | 'perpres' | 'perda' | 'putusan_mk' | 'putusan_ma';
   nomor: string;
   tahun: string;
   judul: string;
-  status_berlaku: 'berlaku' | 'dicabut' | 'diubah';
+  status_berlaku?: 'berlaku' | 'dicabut' | 'diubah';
   version_id: string;
   isi_teks: string;
-  keywords: string[];
+  keywords?: string[];
+  ringkasan_kaidah?: string;
+  frbr_uri?: string;
+  reader_url?: string;
 }
 
 export const LEGAL_KNOWLEDGE_BASE: LegalKnowledgeItem[] = [

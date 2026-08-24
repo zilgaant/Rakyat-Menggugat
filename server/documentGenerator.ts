@@ -8,7 +8,7 @@
  * Supports structured JSON, DOCX export (via docx library), and Print-to-PDF HTML.
  */
 
-import { GoogleGenAI } from '@google/genai';
+import { generateGeminiContentWithRetry } from './geminiHelper';
 import { Document, Paragraph, TextRun, HeadingLevel, AlignmentType, Table, TableRow, TableCell, WidthType, BorderStyle, Header, Footer, PageNumber } from 'docx';
 import { ReconciledAssessmentResult } from './reconciliation';
 import { retrieveRelevantLegalKnowledge, LEGAL_KNOWLEDGE_BASE } from './legalKnowledge';
@@ -148,7 +148,6 @@ export async function generateConstitutionalPetition(
 
   if (apiKey) {
     try {
-      const ai = new GoogleGenAI({ apiKey });
       const prompt = `Anda adalah Ahli Perancang Dokumen Hukum Konstitusi (Constitutional Drafter) Mahkamah Konstitusi Republik Indonesia.
 Tugas Anda adalah merumuskan berkas permohonan "Buku I Permohonan Pengujian Undang-Undang" dan "Daftar Alat Bukti" yang baku, presisi, dan sesuai dengan Peraturan Mahkamah Konstitusi (PMK) No. 2 Tahun 2021.
 
@@ -239,21 +238,15 @@ Hasilkan HANYA JSON murni yang terstruktur valid dengan skema:
   ]
 }Raw JSON only:`;
 
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Gemini API timeout')), 7000)
-      );
-
-      const generatePromise = ai.models.generateContent({
-        model: 'gemini-3.7-flash',
-        contents: prompt,
+      const { text } = await generateGeminiContentWithRetry(prompt, {
+        preferredModel: 'gemini-3.7-flash',
         config: {
           responseMimeType: 'application/json',
           temperature: 0.15,
         }
       });
 
-      const response = await Promise.race([generatePromise, timeoutPromise]) as any;
-      const parsed = JSON.parse(response.text || '{}');
+      const parsed = JSON.parse(text || '{}');
 
       if (parsed.judul_permohonan && parsed.posita && parsed.petitum) {
         return assembleFinalDocument(docId, dateFormatted, defaultIdentity, parsed, reconciledAssessment, positaWarning, caseFacts);

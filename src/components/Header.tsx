@@ -82,7 +82,7 @@ export const Header: React.FC<HeaderProps> = ({
               }`}
             >
               <BookOpen className="w-4 h-4 text-stone-600" />
-              Edukasi Kewenangan
+              Edukasi
             </button>
 
             {currentUser && (
@@ -108,7 +108,7 @@ export const Header: React.FC<HeaderProps> = ({
               }`}
             >
               <Database className="w-4 h-4 text-stone-600" />
-              Basis Hukum & Yurisprudensi
+              Basis Hukum
             </button>
 
             <button
@@ -120,7 +120,7 @@ export const Header: React.FC<HeaderProps> = ({
               }`}
             >
               <Shield className="w-4 h-4 text-stone-600" />
-              Pengaturan & Privasi
+              Privasi
             </button>
           </nav>
 
@@ -133,7 +133,7 @@ export const Header: React.FC<HeaderProps> = ({
                     {currentUser.auth_mode === 'anonim_pseudonim' ? (
                       <span className="inline-flex items-center gap-1 text-emerald-800 bg-emerald-100/80 px-1.5 py-0.5 rounded text-[11px] font-medium border border-emerald-300">
                         <Lock className="w-3 h-3" />
-                        Mode Anonim
+                        Anonim
                       </span>
                     ) : (
                       <span className="text-stone-800 truncate max-w-[140px]">{currentUser.email}</span>
@@ -147,8 +147,8 @@ export const Header: React.FC<HeaderProps> = ({
                 <button
                   onClick={() => setCurrentScreen('privacy')}
                   className="p-2 text-stone-700 hover:text-stone-900 hover:bg-stone-100 rounded-md border border-stone-300"
-                  title="Pengaturan Akun & Privasi"
-                  aria-label="Pengaturan Akun"
+                  title="Privasi"
+                  aria-label="Privasi"
                 >
                   <Settings className="w-4 h-4" />
                 </button>
@@ -168,7 +168,7 @@ export const Header: React.FC<HeaderProps> = ({
                 className="bg-[#881337] hover:bg-[#70102e] text-stone-50 px-4 py-2 rounded-md text-sm font-medium transition shadow-xs flex items-center gap-2 border border-rose-900"
               >
                 <User className="w-4 h-4" />
-                <span>Masuk / Mode Anonim</span>
+                <span>Masuk / Anonim</span>
               </button>
             )}
           </div>
@@ -183,7 +183,7 @@ export const Header: React.FC<HeaderProps> = ({
             currentScreen === 'home' ? 'bg-[#881337] text-white' : 'text-stone-800 bg-white border border-stone-300'
           }`}
         >
-          Edukasi Kewenangan
+          Edukasi
         </button>
         {currentUser && (
           <button
@@ -201,7 +201,7 @@ export const Header: React.FC<HeaderProps> = ({
             currentScreen === 'knowledge' ? 'bg-[#881337] text-white' : 'text-stone-800 bg-white border border-stone-300'
           }`}
         >
-          Basis Hukum & Yurisprudensi
+          Basis Hukum
         </button>
         <button
           onClick={() => setCurrentScreen('privacy')}
@@ -209,7 +209,7 @@ export const Header: React.FC<HeaderProps> = ({
             currentScreen === 'privacy' ? 'bg-[#881337] text-white' : 'text-stone-800 bg-white border border-stone-300'
           }`}
         >
-          Pengaturan & Privasi
+          Privasi
         </button>
       </div>
     </header>

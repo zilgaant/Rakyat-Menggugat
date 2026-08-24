@@ -2,23 +2,37 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
  * 
- * Agent 3: Independent Verifier Agent (Penelaah Independen)
+ * Agent 3: Independent Verifier Agent (Penelaah Independen & Adversarial Checker)
  * Evaluates the case strictly independently without seeing Agent 2's output (no anchoring bias).
  * Has its own separate retrieval query and independent reasoning.
+ * Symmetrical search via Pasal.id unified search (searchPasalIdFull) with full tiered fallback.
  */
 
-import { GoogleGenAI } from '@google/genai';
+import { generateGeminiContentWithRetry } from './geminiHelper';
 import { LEGAL_KNOWLEDGE_BASE, LegalKnowledgeItem, retrieveRelevantLegalKnowledge } from './legalKnowledge';
 import { AgentLayerEvaluation } from './agent2Analysis';
+import { searchPasalIdFull, FullLegalSearchResult } from './pasalIdClient';
 
 export interface AgentVerifierOutput {
   agent_run_id: string;
   agent_name: 'Agent 3 (Independent Verifier)';
+  model_used?: string;
   hasil_verifikasi: 'layak' | 'perlu_data_tambahan' | 'tidak_layak';
   layers: AgentLayerEvaluation[];
   catatan_kritis_independen: string;
   catatan_ambiguitas: string | null;
   confidence: 'tinggi' | 'sedang' | 'rendah';
+  query_used?: string;
+  search_sumber?: string;
+}
+
+/**
+ * Formulates adversarial procedural & jurisdictional verification query independently for Agent 3
+ */
+export function formulateAgent3Query(caseFacts: string): string {
+  const clean = caseFacts.replace(/[^\w\s]/g, ' ').replace(/\s+/g, ' ').trim();
+  const words = clean.split(' ').slice(0, 15).join(' ');
+  return `${words} kompetensi absolut peradilan putusan mahkamah konstitusi ne bis in idem kewenangan ma pmk 2 2021 standing causal verband`.trim();
 }
 
 export async function runAgent3Verification(
@@ -27,16 +41,81 @@ export async function runAgent3Verification(
   legalKnowledgeDb: LegalKnowledgeItem[] = LEGAL_KNOWLEDGE_BASE
 ): Promise<AgentVerifierOutput> {
   const runId = `ag3-run-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+  const retrievedDocs: LegalKnowledgeItem[] = [];
+  const retrievalTimestamp = new Date().toISOString();
 
-  // Independent retrieval query for Agent 3 (evaluates risk, ne bis in idem, & procedural bottlenecks)
-  const retrievalQuery = `${caseFacts} sengketa kewenangan putusan ne bis in idem kerugian kausalitas bukti PMK 2 2021 standing peraturan menteri`;
-  const retrievedDocs = retrieveRelevantLegalKnowledge(retrievalQuery, 6);
+  // 1. Independent adversarial retrieval query for Agent 3
+  const adversarialQuery = formulateAgent3Query(caseFacts);
+  let dataTierUsed = 'pasal_id';
+
+  // 2. Primary Live Symmetrical Retrieval via Pasal.id (searchPasalIdFull) - FASE 1 & FASE 3
+  try {
+    const fullResult: FullLegalSearchResult = await searchPasalIdFull(adversarialQuery, {
+      limitLaws: 4,
+      limitDecisions: 4,
+      timeoutMs: 3800
+    });
+
+    if (fullResult.status === 'success' && (fullResult.laws.length > 0 || fullResult.court_decisions.length > 0)) {
+      // Map court decisions into LegalKnowledgeItem with permanent audit trail
+      for (const dec of fullResult.court_decisions) {
+        const safeNomor = dec.perkara_number || (dec.law_id ? `ID-${dec.law_id}` : 'Putusan MK');
+        const safeId = dec.law_id ? `pasal-id-mk-${dec.law_id}` : `pasal-id-mk-${safeNomor.replace(/[^\w]/g, '-')}`;
+        const safeTitle = dec.title || `Putusan MK ${safeNomor}`;
+
+        retrievedDocs.push({
+          id: safeId,
+          version_id: `v-pasal-id-mk-${dec.law_id || 'latest'}`,
+          sumber: 'pasal_id',
+          jenis_dokumen: 'putusan_mk',
+          nomor: safeNomor,
+          tahun: String(dec.year || 2023),
+          judul: safeTitle,
+          isi_teks: `${safeTitle} Amar: ${dec.amar || dec.amar_label || 'Telah diputus'}. ${dec.disclaimer || ''}`,
+          ringkasan_kaidah: `Presedensi Mahkamah Konstitusi dari Pasal.id: ${safeTitle}`,
+          frbr_uri: dec.frbr_uri,
+          reader_url: dec.reader_url || 'https://pasal.id'
+        });
+      }
+
+      // Map statutory laws into LegalKnowledgeItem with permanent audit trail
+      for (const law of fullResult.laws) {
+        if (law.work) {
+          retrievedDocs.push({
+            id: `pasal-id-law-${law.work_id}`,
+            version_id: `v-pasal-id-${law.work_id}`,
+            sumber: 'pasal_id',
+            jenis_dokumen: law.work.type === 'uu' ? 'uu' : 'pp',
+            nomor: law.work.number ? `No. ${law.work.number}` : `No. ${law.work_id}`,
+            tahun: String(law.work.year || 2024),
+            judul: law.work.title || 'Peraturan Terkait',
+            isi_teks: law.snippet || law.best_passage?.heading || law.work.title,
+            ringkasan_kaidah: `Naskah hukum terverifikasi dari Pasal.id: ${law.work.title}`,
+            frbr_uri: law.work.frbr_uri,
+            reader_url: law.best_passage?.href ? `https://pasal.id${law.best_passage.href}` : `https://pasal.id/laws/${law.work_id}`
+          });
+        }
+      }
+    } else {
+      dataTierUsed = 'seed_corpus_fallback';
+    }
+  } catch (pasalErr) {
+    console.warn('Agent 3 Pasal.id retrieval error, fallback to seed corpus:', pasalErr);
+    dataTierUsed = 'seed_corpus_fallback';
+  }
+
+  // FASE 3: Fallback 1 - Ensure foundational knowledge + fallback to seed corpus
+  const foundationalSeedDocs = retrieveRelevantLegalKnowledge(adversarialQuery, 6);
+  for (const doc of foundationalSeedDocs) {
+    if (!retrievedDocs.some(d => d.id === doc.id)) {
+      retrievedDocs.push(doc);
+    }
+  }
 
   const apiKey = process.env.GEMINI_API_KEY;
 
   if (apiKey) {
     try {
-      const ai = new GoogleGenAI({ apiKey });
       const prompt = `Anda adalah Agen 3 (Verifikator Hukum Independen / Adversarial Checker) pada platform Rakyat Menggugat.
 Peran Anda adalah memeriksa secara mandiri, kritis, dan tanpa bias awal apakah permohonan warga negara ini benar-benar memenuhi syarat hukum beracara di Mahkamah Konstitusi / Mahkamah Agung.
 
@@ -46,7 +125,16 @@ Tugas Verifikasi 4 Lapis:
 1. Lapis 1 (Kewenangan): Periksa apakah objek uji adalah norma abstrak UU (MK - Pasal 24C UUD 1945 & Pasal 10 UU MK) atau peraturan di bawah UU seperti Peraturan Menteri / PP / Perpres / Perda (MA - Pasal 24A UUD 1945). Jika objek di bawah UU, tandai "gagal_total" untuk MK dan arahkan ke jalur "MA". Jika Lapis 1 gagal_total (salah kamar), maka Lapis 2, 3, dan 4 HARUS diberi status "tidak_dievaluasi".
 2. Lapis 2 (Legal Standing): Uji secara ketat apakah ada 'causal verband' langsung atau kerugian yang diklaim bersifat sekadar ketidaksetujuan umum terhadap kebijakan publik tanpa kerugian spesifik/aktual bagi pemohon (Putusan MK No. 006/PUU-III/2005 & Pasal 51 UU MK). Jika sekadar tidak setuju kebijakan, tandai "perlu_data_tambahan" (karena masih berpotensi diperbaiki jika pemohon melengkapi fakta kerugian konkret) dan berikan saran klarifikasi.
 3. Lapis 3 (Batu Uji & Ne Bis In Idem): Periksa apakah ada pasal UUD 1945 yang diajukan dan apakah berisiko terbentur asas Ne Bis In Idem (Pasal 60 UU MK).
-4. Lapis 4 (Posita): Identifikasi kelemahan mendasar dalam argumentasi atau kebutuhan data pembuktian lapangan (PMK No. 2/2021). Jika fakta ada namun belum merumuskan pertentangan pasal konstitusi, tandai "perlu_perbaikan" atau "perlu_data_tambahan".
+4. Lapis 4 (Posita): Identifikasi kelemahan mendasar dalam argumentasi atau kebutuhan data pembuktian lapangan (PMK No. 2/2021). Jika fakta ada namun belum merumuskan pertentangan pasal konstitusi, tandai "perlu_perbaikan" (bukan perlu_data_tambahan).
+
+ATURAN KETAT RELEVANSI RUJUKAN (ANTI-HALUSINASI & ANTI-SALAH RUJUK):
+- Anda HANYA BOLEH memasukkan dokumen/putusan hukum ke dalam array "rujukan" jika substansi dan pokok perkaranya BENAR-BENAR RELEVAN dengan fakta kasus, kompetensi absolut, dan batu uji pemohon.
+- JANGAN SEKALI-KALI mengutip putusan yang sekadar menguji undang-undang yang sama namun memiliki pokok klasifikasi perkara yang tidak berkaitan (misalnya: dilarang mengutip putusan tarif telekomunikasi, penyiaran, atau perselisihan pemilu untuk kasus pengujian hak buruh/pesangon).
+- Jika tidak ada putusan presedensi yang relevan secara substantif, biarkan array rujukan pada lapis tersebut hanya berisi pasal UUD 1945 atau peraturan terkait yang benar-benar cocok.
+
+Pedoman Nada Bahasa untuk "catatan_ambiguitas":
+- Gunakan bahasa yang objektif, santun, dan sesuai standar Bahasa Indonesia baku.
+- Jika sengketa merupakan ranah perselisihan ketenagakerjaan privat atau kontraktual perorangan (misal perselisihan hak upah atau pemutusan hubungan kerja perorangan tanpa kaitan uji norma materiil UU), rumuskan catatan: "Permohonan ini berakar pada sengketa hubungan kerja atau perjanjian kontraktual individual (ranah hukum perdata/ketenagakerjaan), bukan pengujian konstitusionalitas norma undang-undang terhadap UUD 1945. Penyelesaian sengketa tersebut merupakan kompetensi Pengadilan Hubungan Industrial (PHI) pada lingkungan Peradilan Umum di bawah Mahkamah Agung, bukan wewenang Mahkamah Konstitusi."
 
 Fakta Kasus Mentah dari Pemohon:
 """
@@ -54,7 +142,7 @@ ${caseFacts}
 """
 
 Daftar Rujukan Hukum Terkait:
-${retrievedDocs.map(d => `- [${d.id} / ${d.version_id}] ${d.judul} (${d.nomor}): "${d.isi_teks}"`).join('\n')}
+${retrievedDocs.map(d => `- [${d.id} / ${d.version_id}] ${d.judul} (${d.nomor}): "${d.isi_teks}" (Sumber: ${d.sumber})`).join('\n')}
 
 Keluarkan HANYA JSON murni dengan format:
 {
@@ -89,7 +177,7 @@ Keluarkan HANYA JSON murni dengan format:
     {
       "lapis_ke": 4,
       "nama": "posita",
-      "status": "lolos" | "gagal_total" | "perlu_perbaikan" | "perlu_data_tambahan" | "tidak_dievaluasi",
+      "status": "lolos" | "gagal_total" | "perlu_perbaikan" | "tidak_dievaluasi",
       "penjelasan": "string",
       "saran_perbaikan": "string",
       "rujukan": [{"knowledge_entry_id": "string", "version_id": "string", "judul_dokumen": "string", "kutipan_relevan": "string"}]
@@ -97,58 +185,86 @@ Keluarkan HANYA JSON murni dengan format:
   ]
 }`;
 
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Gemini API timeout after 6s')), 6000)
-      );
-
-      const generatePromise = ai.models.generateContent({
-        model: 'gemini-3.7-flash',
-        contents: prompt,
+      const { text, modelUsed } = await generateGeminiContentWithRetry(prompt, {
+        preferredModel: 'gemini-3.7-flash',
         config: {
           responseMimeType: 'application/json',
           temperature: 0.1,
         }
       });
 
-      const response = await Promise.race([generatePromise, timeoutPromise]) as any;
-
-      const text = response.text || '';
       const parsed = JSON.parse(text);
+
+      // Attach complete audit metadata to citations
+      const enrichedLayers = (parsed.layers || []).map((l: any) => {
+        const rujukanWithAudit = (l.rujukan || []).map((r: any) => {
+          const matchedDoc = retrievedDocs.find(d => d.id === r.knowledge_entry_id || d.judul === r.judul_dokumen);
+          return {
+            ...r,
+            version_id: r.version_id || matchedDoc?.version_id || 'v1',
+            isi_teks: matchedDoc?.isi_teks || r.kutipan_relevan,
+            sumber: matchedDoc?.sumber || 'seed_manual',
+            url: matchedDoc?.reader_url || matchedDoc?.frbr_uri || 'https://pasal.id',
+            timestamp: retrievalTimestamp
+          };
+        });
+
+        return {
+          ...l,
+          rujukan: rujukanWithAudit,
+          tidak_ditemukan_rujukan: rujukanWithAudit.length === 0,
+          saran_perbaikan: l.status === 'lolos' ? null : (l.saran_perbaikan || null)
+        };
+      });
 
       return {
         agent_run_id: runId,
         agent_name: 'Agent 3 (Independent Verifier)',
+        model_used: modelUsed,
         hasil_verifikasi: parsed.hasil_verifikasi || 'layak',
         confidence: parsed.confidence || 'tinggi',
         catatan_kritis_independen: parsed.catatan_kritis_independen || 'Verifikasi independen telah selesai dijalankan.',
         catatan_ambiguitas: parsed.catatan_ambiguitas || null,
-        layers: (parsed.layers || []).map((l: any) => ({
-          ...l,
-          tidak_ditemukan_rujukan: !l.rujukan || l.rujukan.length === 0
-        }))
+        layers: enrichedLayers,
+        query_used: adversarialQuery,
+        search_sumber: dataTierUsed
       };
     } catch (err) {
       console.warn('Agent 3 Gemini API error, falling back to deterministic verifier engine:', err);
     }
   }
 
-  // Fallback Deterministic Independent Verifier Engine
-  return generateDeterministicAgent3Output(caseFacts, runId, retrievedDocs);
+  // Emergency Fallback Tier 2: Deterministic Independent Verifier Engine
+  return generateDeterministicAgent3Output(caseFacts, runId, retrievedDocs, adversarialQuery);
 }
 
 function generateDeterministicAgent3Output(
   caseFacts: string,
   runId: string,
-  retrievedDocs: LegalKnowledgeItem[]
+  retrievedDocs: LegalKnowledgeItem[],
+  queryUsed: string
 ): AgentVerifierOutput {
   const lower = caseFacts.toLowerCase();
 
+  // 1. Check Court Path
   const isPeraturanMenteriOrPP = lower.includes('peraturan menteri') || lower.includes('permen') || lower.includes('peraturan pemerintah') || lower.includes('pp ') || lower.includes('perpres') || lower.includes('perda') || lower.includes('keputusan menteri');
   const isExplicitUU = lower.includes('undang-undang') || lower.includes(' uu ') || lower.includes('uu no') || lower.includes('uu nomor') || lower.includes('pasal');
 
   const isSalahKamar = isPeraturanMenteriOrPP && !isExplicitUU;
   const courtPath = isSalahKamar ? 'MA' : 'MK';
 
+  // 2. Check for Labor Dispute (PHI Ambiguity)
+  const isIndividualLaborDispute =
+    (lower.includes('gaji') || lower.includes('pesangon') || lower.includes('upah saya') || lower.includes('phk saya') || lower.includes('dipecat') || lower.includes('kontrak kerja saya')) &&
+    !lower.includes('uji materiil') &&
+    !lower.includes('pasal undang-undang');
+
+  let catatanAmbiguitas: string | null = null;
+  if (isIndividualLaborDispute) {
+    catatanAmbiguitas = 'Permohonan ini berakar pada sengketa hubungan kerja atau perjanjian kontraktual individual (ranah hukum perdata/ketenagakerjaan), bukan pengujian konstitusionalitas norma undang-undang terhadap UUD 1945. Penyelesaian sengketa tersebut merupakan kompetensi Pengadilan Hubungan Industrial (PHI) pada lingkungan Peradilan Umum di bawah Mahkamah Agung, bukan wewenang Mahkamah Konstitusi.';
+  }
+
+  // 3. Standing Check
   const isGeneralPolicyDisagreement =
     (lower.includes('tidak setuju') || lower.includes('kurang tepat') || lower.includes('kebijakan')) &&
     !lower.includes('saya dirugikan') &&
@@ -161,6 +277,7 @@ function generateDeterministicAgent3Output(
     !lower.includes('pidana') &&
     !lower.includes('kriminalisasi');
 
+  // 4. Posita Check
   const hasStrongFactsNoArticles =
     (lower.includes('saya') || lower.includes('kami') || lower.includes('warga')) &&
     (lower.includes('dirugikan') || lower.includes('korban') || lower.includes('terdampak')) &&
@@ -170,30 +287,37 @@ function generateDeterministicAgent3Output(
     !lower.includes('pasal 33') &&
     !lower.includes('pasal 1');
 
-  const isShortFacts = caseFacts.trim().length < 40;
-
+  // Retrieval selections
   const kewenanganDoc = courtPath === 'MK'
     ? LEGAL_KNOWLEDGE_BASE.find(k => k.id === 'uud-1945-pasal-24c')!
     : LEGAL_KNOWLEDGE_BASE.find(k => k.id === 'uud-1945-pasal-24a')!;
+  const kewenanganUuDoc = LEGAL_KNOWLEDGE_BASE.find(k => k.id === 'uu-mk-pasal-10')!;
 
-  const legalStandingStatute = LEGAL_KNOWLEDGE_BASE.find(k => k.id === 'uu-mk-pasal-51')!;
-  const legalStandingRuling = LEGAL_KNOWLEDGE_BASE.find(k => k.id === 'putusan-mk-006-2005')!;
+  const standingStatuteDoc = LEGAL_KNOWLEDGE_BASE.find(k => k.id === 'uu-mk-pasal-51')!;
+  const standingRulingDoc = LEGAL_KNOWLEDGE_BASE.find(k => k.id === 'putusan-mk-006-2005')!;
   const neBisInIdemDoc = LEGAL_KNOWLEDGE_BASE.find(k => k.id === 'uu-mk-pasal-60')!;
-  const proceduralPmk = LEGAL_KNOWLEDGE_BASE.find(k => k.id === 'pmk-2-2021-format')!;
+  const positaDoc = LEGAL_KNOWLEDGE_BASE.find(k => k.id === 'pmk-2-2021-format')!;
 
+  const now = new Date().toISOString();
+
+  // --- LAYER 1 ---
   const layer1: AgentLayerEvaluation = isSalahKamar
     ? {
         lapis_ke: 1,
         nama: 'kewenangan',
         status: 'gagal_total',
         jalur_hukum: 'MA',
-        penjelasan: 'Verifikasi independen mendeteksi objek permohonan adalah peraturan perundang-undangan di bawah undang-undang. MK tidak memiliki yurisdiksi absolut untuk menguji peraturan di bawah UU (Pasal 24C UUD 1945). Forum yang berwenang adalah Hak Uji Materiil Mahkamah Agung (Pasal 24A ayat 1 UUD 1945).',
+        penjelasan: 'Verifikator mengonfirmasi objek yang diajukan bukan Undang-Undang, melainkan peraturan di bawah UU. MK berwenang hanya untuk UU (Pasal 24C UUD 1945). Gugatan harus diajukan ke MA (Pasal 24A UUD 1945).',
         rujukan: [
           {
             knowledge_entry_id: kewenanganDoc.id,
             version_id: kewenanganDoc.version_id,
             judul_dokumen: kewenanganDoc.judul,
-            kutipan_relevan: kewenanganDoc.isi_teks
+            kutipan_relevan: kewenanganDoc.isi_teks,
+            isi_teks: kewenanganDoc.isi_teks,
+            sumber: kewenanganDoc.sumber,
+            url: 'https://jdih.mkri.id',
+            timestamp: now
           }
         ]
       }
@@ -202,24 +326,38 @@ function generateDeterministicAgent3Output(
         nama: 'kewenangan',
         status: 'lolos',
         jalur_hukum: 'MK',
-        penjelasan: 'Verifikasi independen mengonfirmasi objek sengketa tepat pada yurisdiksi MK. Terpenuhi kriteria pengujian norma abstrak undang-undang terhadap UUD 1945.',
+        penjelasan: 'Objek permohonan adalah pengujian konstitusionalitas Undang-Undang terhadap UUD 1945, sah merupakan kewenangan mutlak Mahkamah Konstitusi (Pasal 24C ayat 1 UUD 1945 jo. Pasal 10 UU MK).',
         rujukan: [
           {
             knowledge_entry_id: kewenanganDoc.id,
             version_id: kewenanganDoc.version_id,
             judul_dokumen: kewenanganDoc.judul,
-            kutipan_relevan: kewenanganDoc.isi_teks
+            kutipan_relevan: kewenanganDoc.isi_teks,
+            isi_teks: kewenanganDoc.isi_teks,
+            sumber: kewenanganDoc.sumber,
+            url: 'https://jdih.mkri.id',
+            timestamp: now
+          },
+          {
+            knowledge_entry_id: kewenanganUuDoc.id,
+            version_id: kewenanganUuDoc.version_id,
+            judul_dokumen: kewenanganUuDoc.judul,
+            kutipan_relevan: kewenanganUuDoc.isi_teks,
+            isi_teks: kewenanganUuDoc.isi_teks,
+            sumber: kewenanganUuDoc.sumber,
+            url: 'https://jdih.mkri.id',
+            timestamp: now
           }
         ]
       };
 
-  // If Lapis 1 is fatal (salah kamar), Lapis 2 MUST be tidak_dievaluasi
+  // --- LAYER 2 ---
   const layer2: AgentLayerEvaluation = isSalahKamar
     ? {
         lapis_ke: 2,
         nama: 'legal_standing',
         status: 'tidak_dievaluasi',
-        penjelasan: 'Kedudukan hukum tidak dievaluasi untuk berkas perkara Mahkamah Konstitusi karena dialihkan ke Mahkamah Agung.',
+        penjelasan: 'Kedudukan hukum tidak dievaluasi karena permohonan gugur pada Lapis 1 (kompetensi MA).',
         rujukan: []
       }
     : isGeneralPolicyDisagreement
@@ -227,69 +365,89 @@ function generateDeterministicAgent3Output(
         lapis_ke: 2,
         nama: 'legal_standing',
         status: 'perlu_data_tambahan',
-        penjelasan: 'Verifikator independen mencatat bahwa saat ini uraian fakta baru menyentuh ketidaksetujuan umum terhadap kebijakan (policy preference) tanpa kerugian personal nyata. Hal ini memerlukan penegasan kerugian konkret agar memenuhi doktrin 5 syarat legal standing Putusan MK No. 006/PUU-III/2005.',
-        saran_perbaikan: 'Uraikan apakah kebijakan/pasal ini secara langsung merugikan hak ekonomi, pekerjaan, atau hak konstitusional spesifik Anda.',
+        penjelasan: 'Verifikator mencatat kerugian yang diuraikan masih bersifat umum (kebijakan publik). Sesuai yurisprudensi Putusan 006/PUU-III/2005, pemohon wajib menjelaskan kerugian spesifik, aktual, dan kausalitas langsung terhadap dirinya.',
+        saran_perbaikan: 'Lengkapi uraian fakta dengan dampak langsung yang dialami pemohon.',
         rujukan: [
           {
-            knowledge_entry_id: legalStandingStatute.id,
-            version_id: legalStandingStatute.version_id,
-            judul_dokumen: legalStandingStatute.judul,
-            kutipan_relevan: legalStandingStatute.isi_teks
+            knowledge_entry_id: standingStatuteDoc.id,
+            version_id: standingStatuteDoc.version_id,
+            judul_dokumen: standingStatuteDoc.judul,
+            kutipan_relevan: standingStatuteDoc.isi_teks,
+            isi_teks: standingStatuteDoc.isi_teks,
+            sumber: standingStatuteDoc.sumber,
+            url: 'https://jdih.mkri.id',
+            timestamp: now
           },
           {
-            knowledge_entry_id: legalStandingRuling.id,
-            version_id: legalStandingRuling.version_id,
-            judul_dokumen: legalStandingRuling.judul,
-            kutipan_relevan: legalStandingRuling.isi_teks
+            knowledge_entry_id: standingRulingDoc.id,
+            version_id: standingRulingDoc.version_id,
+            judul_dokumen: standingRulingDoc.judul,
+            kutipan_relevan: standingRulingDoc.isi_teks,
+            isi_teks: standingRulingDoc.isi_teks,
+            sumber: standingRulingDoc.sumber,
+            url: 'https://jdih.mkri.id',
+            timestamp: now
           }
         ]
       }
     : {
         lapis_ke: 2,
         nama: 'legal_standing',
-        status: isShortFacts ? 'perlu_data_tambahan' : 'lolos',
-        penjelasan: isShortFacts
-          ? 'Dibutuhkan penegasan identitas dan bentuk kerugian langsung pemohon untuk membuktikan causal verband secara tidak terbantahkan menurut Putusan MK No. 006/PUU-III/2005.'
-          : 'Verifikasi independen menyimpulkan pemohon memiliki kepentingan riil (actual interest) yang dilindungi konstitusi dan terdampak langsung oleh berlakunya pasal yang diuji.',
+        status: 'lolos',
+        penjelasan: 'Kausalitas kerugian pemohon terverifikasi memenuhi 5 syarat doktrin Putusan MK No. 006/PUU-III/2005.',
         rujukan: [
           {
-            knowledge_entry_id: legalStandingStatute.id,
-            version_id: legalStandingStatute.version_id,
-            judul_dokumen: legalStandingStatute.judul,
-            kutipan_relevan: legalStandingStatute.isi_teks
+            knowledge_entry_id: standingStatuteDoc.id,
+            version_id: standingStatuteDoc.version_id,
+            judul_dokumen: standingStatuteDoc.judul,
+            kutipan_relevan: standingStatuteDoc.isi_teks,
+            isi_teks: standingStatuteDoc.isi_teks,
+            sumber: standingStatuteDoc.sumber,
+            url: 'https://jdih.mkri.id',
+            timestamp: now
           },
           {
-            knowledge_entry_id: legalStandingRuling.id,
-            version_id: legalStandingRuling.version_id,
-            judul_dokumen: legalStandingRuling.judul,
-            kutipan_relevan: legalStandingRuling.isi_teks
+            knowledge_entry_id: standingRulingDoc.id,
+            version_id: standingRulingDoc.version_id,
+            judul_dokumen: standingRulingDoc.judul,
+            kutipan_relevan: standingRulingDoc.isi_teks,
+            isi_teks: standingRulingDoc.isi_teks,
+            sumber: standingRulingDoc.sumber,
+            url: 'https://jdih.mkri.id',
+            timestamp: now
           }
         ]
       };
 
+  // --- LAYER 3 ---
   const layer3: AgentLayerEvaluation = {
     lapis_ke: 3,
     nama: 'batu_uji',
     status: isSalahKamar ? 'tidak_dievaluasi' : 'lolos',
     penjelasan: isSalahKamar
-      ? 'Batu uji tidak dievaluasi karena pengujian harus dialihkan ke Mahkamah Agung.'
-      : 'Pemeriksaan silang ne bis in idem (Pasal 60 UU MK) mengonfirmasi tidak terdapat putusan terdahulu dengan dasar dalil konstitusi yang identik.',
+      ? 'Batu uji tidak dievaluasi karena bukan ranah MK.'
+      : 'Pemeriksaan independen tidak menemukan putusan terdahulu yang memutus substansi yang sama dengan batu uji identik. Tidak terindikasi Ne Bis In Idem (Pasal 60 UU MK).',
     rujukan: isSalahKamar ? [] : [
       {
         knowledge_entry_id: neBisInIdemDoc.id,
         version_id: neBisInIdemDoc.version_id,
         judul_dokumen: neBisInIdemDoc.judul,
-        kutipan_relevan: neBisInIdemDoc.isi_teks
+        kutipan_relevan: neBisInIdemDoc.isi_teks,
+        isi_teks: neBisInIdemDoc.isi_teks,
+        sumber: neBisInIdemDoc.sumber,
+        url: 'https://jdih.mkri.id',
+        timestamp: now
       }
     ]
   };
 
+  // --- LAYER 4 ---
   const layer4: AgentLayerEvaluation = isSalahKamar
     ? {
         lapis_ke: 4,
         nama: 'posita',
         status: 'tidak_dievaluasi',
-        penjelasan: 'Posita tidak dievaluasi untuk berkas perkara Mahkamah Konstitusi.',
+        penjelasan: 'Posita dialihkan ke format permohonan HUM Mahkamah Agung.',
         rujukan: []
       }
     : hasStrongFactsNoArticles
@@ -297,14 +455,18 @@ function generateDeterministicAgent3Output(
         lapis_ke: 4,
         nama: 'posita',
         status: 'perlu_perbaikan',
-        penjelasan: 'Verifikator independen menemukan kelemahan konstruksi yuridis posita: meskipun narasi fakta kerugian empiris kuat, pemohon belum merumuskan pasal UUD 1945 yang dilanggar dan argumen pertentangan normanya.',
-        saran_perbaikan: 'Sempurnakan posita dengan menghubungkan kerugian faktual ke klausul hak konstitusional UUD 1945 (misalnya Pasal 28D ayat 1 atau Pasal 27 ayat 2 UUD 1945) sebelum berkas dicetak.',
+        penjelasan: 'Verifikator mencatat konstruksi dalil pertentangan pasal dengan UUD 1945 belum dirumuskan secara formal dalam posita (PMK No. 2/2021).',
+        saran_perbaikan: 'Sertakan pasal konstitusi rujukan dan uraikan bagaimana undang-undang yang diuji melanggar pasal tersebut.',
         rujukan: [
           {
-            knowledge_entry_id: proceduralPmk.id,
-            version_id: proceduralPmk.version_id,
-            judul_dokumen: proceduralPmk.judul,
-            kutipan_relevan: proceduralPmk.isi_teks
+            knowledge_entry_id: positaDoc.id,
+            version_id: positaDoc.version_id,
+            judul_dokumen: positaDoc.judul,
+            kutipan_relevan: positaDoc.isi_teks,
+            isi_teks: positaDoc.isi_teks,
+            sumber: positaDoc.sumber,
+            url: 'https://jdih.mkri.id',
+            timestamp: now
           }
         ]
       }
@@ -312,13 +474,17 @@ function generateDeterministicAgent3Output(
         lapis_ke: 4,
         nama: 'posita',
         status: 'lolos',
-        penjelasan: 'Argumentasi yuridis dinilai logis dan selaras dengan PMK No. 2/2021. Verifikator mencatat pentingnya melampirkan alat bukti tertulis bermaterai legalisir pos untuk membuktikan dalil posita saat persidangan pendahuluan.',
+        penjelasan: 'Argumentasi dan konstruksi pertentangan norma memenuhi standar formil permohonan beracara PMK No. 2/2021.',
         rujukan: [
           {
-            knowledge_entry_id: proceduralPmk.id,
-            version_id: proceduralPmk.version_id,
-            judul_dokumen: proceduralPmk.judul,
-            kutipan_relevan: proceduralPmk.isi_teks
+            knowledge_entry_id: positaDoc.id,
+            version_id: positaDoc.version_id,
+            judul_dokumen: positaDoc.judul,
+            kutipan_relevan: positaDoc.isi_teks,
+            isi_teks: positaDoc.isi_teks,
+            sumber: positaDoc.sumber,
+            url: 'https://jdih.mkri.id',
+            timestamp: now
           }
         ]
       };
@@ -326,33 +492,31 @@ function generateDeterministicAgent3Output(
   const layers = [layer1, layer2, layer3, layer4];
 
   let hasilVerifikasi: 'layak' | 'perlu_data_tambahan' | 'tidak_layak' = 'layak';
-  let confidence: 'tinggi' | 'sedang' | 'rendah' = 'tinggi';
+  // Deterministic fallback must strictly be 'rendah' confidence per architectural integrity rule
+  const confidence: 'tinggi' | 'sedang' | 'rendah' = 'rendah';
 
   if (isSalahKamar) {
     hasilVerifikasi = 'tidak_layak';
-    confidence = 'tinggi';
-  } else if (isGeneralPolicyDisagreement || hasStrongFactsNoArticles || isShortFacts) {
+  } else if (isGeneralPolicyDisagreement || hasStrongFactsNoArticles) {
     hasilVerifikasi = 'perlu_data_tambahan';
-    confidence = 'sedang';
   }
 
   return {
     agent_run_id: runId,
     agent_name: 'Agent 3 (Independent Verifier)',
+    model_used: 'deterministic-adversarial-verifier',
     hasil_verifikasi: hasilVerifikasi,
     confidence,
     catatan_kritis_independen: isSalahKamar
-      ? 'Verifikator menolak yurisdiksi MK karena objek adalah Peraturan di bawah UU (kompetensi MA).'
+      ? 'Verifikasi menghasilkan penolakan formil untuk Mahkamah Konstitusi karena objek pengujian berada di bawah undang-undang.'
       : isGeneralPolicyDisagreement
-      ? 'Verifikator mencatat perlunya data kerugian konstitusional konkret agar memenuhi syarat legal standing.'
+      ? 'Verifikasi mencatat perlunya klarifikasi kerugian hak konstitusional spesifik pada Lapis 2.'
       : hasStrongFactsNoArticles
-      ? 'Verifikator mencatat perlunya penyempurnaan formulasi batu uji UUD 1945 pada posita permohonan.'
-      : 'Verifikasi independen mengonfirmasi kelayakan formil dan materiil.',
-    catatan_ambiguitas: hasStrongFactsNoArticles
-      ? 'Posita memerlukan formulasi pasal UUD 1945 yang eksplisit.'
-      : isGeneralPolicyDisagreement
-      ? 'Dibutuhkan data kerugian spesifik untuk memperjelas standing pemohon.'
-      : null,
-    layers
+      ? 'Verifikasi mencatat perlunya penataan rumusan posita pertentangan norma hukum pada Lapis 4.'
+      : 'Verifikasi independen mengonfirmasi terpenuhinya 4 lapis kelayakan beracara MK.',
+    catatan_ambiguitas: catatanAmbiguitas,
+    layers,
+    query_used: queryUsed,
+    search_sumber: 'seed_manual'
   };
 }

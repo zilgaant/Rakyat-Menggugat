@@ -4,10 +4,12 @@
  * 
  * Agent 2: Legal Analysis Agent (Analisis Yuridis 4-Lapis)
  * Performs independent constitutional assessment grounded in foundational legal knowledge base.
+ * Symmetrical search via Pasal.id unified search (searchPasalIdFull) with full tiered fallback.
  */
 
-import { GoogleGenAI } from '@google/genai';
+import { generateGeminiContentWithRetry } from './geminiHelper';
 import { LEGAL_KNOWLEDGE_BASE, LegalKnowledgeItem, retrieveRelevantLegalKnowledge } from './legalKnowledge';
+import { searchPasalIdFull, FullLegalSearchResult } from './pasalIdClient';
 
 export interface AgentLayerEvaluation {
   lapis_ke: 1 | 2 | 3 | 4;
@@ -20,19 +22,35 @@ export interface AgentLayerEvaluation {
     version_id?: string;
     judul_dokumen?: string;
     kutipan_relevan: string;
+    isi_teks?: string;
+    sumber?: string;
+    url?: string;
+    timestamp?: string;
   }>;
   tidak_ditemukan_rujukan?: boolean;
   argumen_konstitusional_teridentifikasi?: string[];
-  saran_perbaikan?: string;
+  saran_perbaikan?: string | null;
 }
 
 export interface AgentAnalysisOutput {
   agent_run_id: string;
   agent_name: 'Agent 2 (Legal Analyst)';
+  model_used?: string;
   hasil_evaluasi: 'layak' | 'perlu_data_tambahan' | 'tidak_layak';
   layers: AgentLayerEvaluation[];
   analisis_yuridis_ringkas: string;
   confidence: 'tinggi' | 'sedang' | 'rendah';
+  query_used?: string;
+  search_sumber?: string;
+}
+
+/**
+ * Formulates substantive legal query independently for Agent 2
+ */
+export function formulateAgent2Query(caseFacts: string): string {
+  const clean = caseFacts.replace(/[^\w\s]/g, ' ').replace(/\s+/g, ' ').trim();
+  const words = clean.split(' ').slice(0, 15).join(' ');
+  return `${words} pengujian norma materiil kerugian konstitusional pasal 51 uu mk batu uji uud 1945`.trim();
 }
 
 export async function runAgent2Analysis(
@@ -41,21 +59,92 @@ export async function runAgent2Analysis(
   legalKnowledgeDb: LegalKnowledgeItem[] = LEGAL_KNOWLEDGE_BASE
 ): Promise<AgentAnalysisOutput> {
   const runId = `ag2-run-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+  const retrievedDocs: LegalKnowledgeItem[] = [];
+  const retrievalTimestamp = new Date().toISOString();
 
-  // Independent retrieval query for Agent 2
-  const retrievedDocs = retrieveRelevantLegalKnowledge(caseFacts, 6);
+  // 1. Formulate Agent 2's custom substantive legal query
+  const substantiveQuery = formulateAgent2Query(caseFacts);
+  let dataTierUsed = 'pasal_id';
+
+  // 2. Primary Live Symmetrical Retrieval via Pasal.id (searchPasalIdFull) - FASE 1 & FASE 3
+  try {
+    const fullResult: FullLegalSearchResult = await searchPasalIdFull(substantiveQuery, {
+      limitLaws: 4,
+      limitDecisions: 3,
+      timeoutMs: 3800
+    });
+
+    if (fullResult.status === 'success' && (fullResult.laws.length > 0 || fullResult.court_decisions.length > 0)) {
+      // Map statutory laws into LegalKnowledgeItem with permanent audit trail
+      for (const law of fullResult.laws) {
+        if (law.work) {
+          retrievedDocs.push({
+            id: `pasal-id-law-${law.work_id}`,
+            version_id: `v-pasal-id-${law.work_id}`,
+            sumber: 'pasal_id',
+            jenis_dokumen: law.work.type === 'uu' ? 'uu' : 'pp',
+            nomor: law.work.number ? `No. ${law.work.number}` : `No. ${law.work_id}`,
+            tahun: String(law.work.year || 2024),
+            judul: law.work.title || 'Peraturan Terkait',
+            isi_teks: law.snippet || law.best_passage?.heading || law.work.title,
+            ringkasan_kaidah: `Naskah hukum terverifikasi dari Pasal.id: ${law.work.title}`,
+            frbr_uri: law.work.frbr_uri,
+            reader_url: law.best_passage?.href ? `https://pasal.id${law.best_passage.href}` : `https://pasal.id/laws/${law.work_id}`
+          });
+        }
+      }
+
+      // Map court decisions into LegalKnowledgeItem with permanent audit trail
+      for (const dec of fullResult.court_decisions) {
+        const safeNomor = dec.perkara_number || (dec.law_id ? `ID-${dec.law_id}` : 'Putusan MK');
+        const safeId = dec.law_id ? `pasal-id-mk-${dec.law_id}` : `pasal-id-mk-${safeNomor.replace(/[^\w]/g, '-')}`;
+        const safeTitle = dec.title || `Putusan MK ${safeNomor}`;
+
+        retrievedDocs.push({
+          id: safeId,
+          version_id: `v-pasal-id-mk-${dec.law_id || 'latest'}`,
+          sumber: 'pasal_id',
+          jenis_dokumen: 'putusan_mk',
+          nomor: safeNomor,
+          tahun: String(dec.year || 2023),
+          judul: safeTitle,
+          isi_teks: `${safeTitle} Amar: ${dec.amar || dec.amar_label || 'Telah diputus'}. ${dec.disclaimer || ''}`,
+          ringkasan_kaidah: `Presedensi Mahkamah Konstitusi dari Pasal.id: ${safeTitle}`,
+          frbr_uri: dec.frbr_uri,
+          reader_url: dec.reader_url || 'https://pasal.id'
+        });
+      }
+    } else {
+      dataTierUsed = 'seed_corpus_fallback';
+    }
+  } catch (pasalErr) {
+    console.warn('Agent 2 Pasal.id retrieval error, fallback to seed corpus:', pasalErr);
+    dataTierUsed = 'seed_corpus_fallback';
+  }
+
+  // FASE 3: Fallback 1 - Always ensure foundational knowledge + fallback to seed corpus
+  const foundationalSeedDocs = retrieveRelevantLegalKnowledge(caseFacts, 6);
+  for (const doc of foundationalSeedDocs) {
+    if (!retrievedDocs.some(d => d.id === doc.id)) {
+      retrievedDocs.push(doc);
+    }
+  }
 
   const apiKey = process.env.GEMINI_API_KEY;
 
   if (apiKey) {
     try {
-      const ai = new GoogleGenAI({ apiKey });
       const prompt = `Anda adalah Agen 2 (Analis Hukum Konstitusi Independen) pada platform Rakyat Menggugat.
 Tugas Anda adalah melakukan asesmen kelayakan pengujian norma hukum secara objektif, ketat, dan berbasis 4 lapis kelayakan:
 1. Lapis 1 (Kewenangan Lembaga Peradilan): Tentukan apakah objek yang dipersoalkan adalah norma Undang-Undang (MK - Pasal 24C UUD 1945 & UU MK) atau peraturan di bawah UU seperti Peraturan Menteri / PP / Perpres / Perda (MA - Pasal 24A UUD 1945). Jika objek adalah Peraturan Menteri / PP / Perpres / Perda, status Lapis 1 adalah "gagal_total" untuk MK dan jalur_hukum adalah "MA". Jika Lapis 1 gagal_total (salah kamar), maka Lapis 2, 3, dan 4 HARUS diberi status "tidak_dievaluasi".
 2. Lapis 2 (Kedudukan Hukum / Legal Standing): Evaluasi 5 syarat kerugian konstitusional Putusan MK No. 006/PUU-III/2005 & Pasal 51 UU MK. Jika keluhan berupa ketidaksetujuan umum terhadap kebijakan publik tanpa kerugian spesifik/aktual bagi diri pemohon, status Lapis 2 adalah "perlu_data_tambahan" (bukan tidak layak permanen) dan berikan saran pertanyaan klarifikasi.
 3. Lapis 3 (Batu Uji & Ne Bis In Idem): Tentukan pasal UUD 1945 yang tepat menjadi dasar pengujian dan evaluasi potensi ne bis in idem (Pasal 60 UU MK).
-4. Lapis 4 (Posita & Penalaran Hukum): Evaluasi apakah dalil pertentangan norma telah terumuskan logis atau belum ada rumusan pertentangan norma UUD yang jelas. Jika fakta jelas tapi belum merumuskan pasal batu uji atau pertentangan normanya, status Lapis 4 adalah "perlu_perbaikan" atau "perlu_data_tambahan".
+4. Lapis 4 (Posita & Penalaran Hukum): Evaluasi apakah dalil pertentangan norma telah terumuskan logis atau belum ada rumusan pertentangan norma UUD yang jelas. Jika fakta jelas tapi belum merumuskan pasal batu uji atau pertentangan normanya, status Lapis 4 adalah "perlu_perbaikan" (bukan perlu_data_tambahan).
+
+ATURAN KETAT RELEVANSI RUJUKAN (ANTI-HALUSINASI & ANTI-SALAH RUJUK):
+- Anda HANYA BOLEH memasukkan dokumen/putusan hukum ke dalam array "rujukan" jika substansi dan pokok perkaranya BENAR-BENAR RELEVAN dengan fakta kasus dan batu uji pemohon.
+- JANGAN SEKALI-KALI mengutip putusan yang sekadar menguji undang-undang yang sama namun memiliki pokok klasifikasi perkara yang tidak berkaitan (misalnya: dilarang mengutip putusan tarif telekomunikasi, penyiaran, atau perselisihan pemilu untuk kasus pengujian hak buruh/pesangon).
+- Jika tidak ada putusan presedensi yang relevan secara substantif, biarkan array rujukan pada lapis tersebut hanya berisi pasal UUD 1945 atau peraturan terkait yang benar-benar cocok.
 
 Fakta Kasus Pemohon:
 """
@@ -63,7 +152,7 @@ ${caseFacts}
 """
 
 Kumpulan Norma Hukum Terkait yang Tersedia:
-${retrievedDocs.map(d => `- [${d.id} / ${d.version_id}] ${d.judul} (${d.nomor}): "${d.isi_teks}"`).join('\n')}
+${retrievedDocs.map(d => `- [${d.id} / ${d.version_id}] ${d.judul} (${d.nomor}): "${d.isi_teks}" (Sumber: ${d.sumber})`).join('\n')}
 
 Keluarkan HANYA JSON murni dengan skema:
 {
@@ -97,7 +186,7 @@ Keluarkan HANYA JSON murni dengan skema:
     {
       "lapis_ke": 4,
       "nama": "posita",
-      "status": "lolos" | "gagal_total" | "perlu_perbaikan" | "perlu_data_tambahan" | "tidak_dievaluasi",
+      "status": "lolos" | "gagal_total" | "perlu_perbaikan" | "tidak_dievaluasi",
       "penjelasan": "string",
       "saran_perbaikan": "string",
       "rujukan": [{"knowledge_entry_id": "string", "version_id": "string", "judul_dokumen": "string", "kutipan_relevan": "string"}]
@@ -105,48 +194,63 @@ Keluarkan HANYA JSON murni dengan skema:
   ]
 }`;
 
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Gemini API timeout after 6s')), 6000)
-      );
-
-      const generatePromise = ai.models.generateContent({
-        model: 'gemini-3.7-flash',
-        contents: prompt,
+      const { text, modelUsed } = await generateGeminiContentWithRetry(prompt, {
+        preferredModel: 'gemini-3.7-flash',
         config: {
           responseMimeType: 'application/json',
           temperature: 0.1,
         }
       });
 
-      const response = await Promise.race([generatePromise, timeoutPromise]) as any;
-
-      const text = response.text || '';
       const parsed = JSON.parse(text);
+
+      // Attach complete audit metadata to citations
+      const enrichedLayers = (parsed.layers || []).map((l: any) => {
+        const rujukanWithAudit = (l.rujukan || []).map((r: any) => {
+          const matchedDoc = retrievedDocs.find(d => d.id === r.knowledge_entry_id || d.judul === r.judul_dokumen);
+          return {
+            ...r,
+            version_id: r.version_id || matchedDoc?.version_id || 'v1',
+            isi_teks: matchedDoc?.isi_teks || r.kutipan_relevan,
+            sumber: matchedDoc?.sumber || 'seed_manual',
+            url: matchedDoc?.reader_url || matchedDoc?.frbr_uri || 'https://pasal.id',
+            timestamp: retrievalTimestamp
+          };
+        });
+
+        return {
+          ...l,
+          rujukan: rujukanWithAudit,
+          tidak_ditemukan_rujukan: rujukanWithAudit.length === 0,
+          saran_perbaikan: l.status === 'lolos' ? null : (l.saran_perbaikan || null)
+        };
+      });
 
       return {
         agent_run_id: runId,
         agent_name: 'Agent 2 (Legal Analyst)',
+        model_used: modelUsed,
         hasil_evaluasi: parsed.hasil_evaluasi || 'layak',
         confidence: parsed.confidence || 'tinggi',
         analisis_yuridis_ringkas: parsed.analisis_yuridis_ringkas || 'Analisis hukum 4 lapis telah selesai disusun.',
-        layers: (parsed.layers || []).map((l: any) => ({
-          ...l,
-          tidak_ditemukan_rujukan: !l.rujukan || l.rujukan.length === 0
-        }))
+        layers: enrichedLayers,
+        query_used: substantiveQuery,
+        search_sumber: dataTierUsed
       };
     } catch (err) {
       console.warn('Agent 2 Gemini API error, falling back to deterministic legal engine:', err);
     }
   }
 
-  // Fallback Deterministic Legal Inference Engine for Agent 2
-  return generateDeterministicAgent2Output(caseFacts, runId, retrievedDocs);
+  // Emergency Fallback Tier 2: Deterministic Legal Inference Engine for Agent 2
+  return generateDeterministicAgent2Output(caseFacts, runId, retrievedDocs, substantiveQuery);
 }
 
 function generateDeterministicAgent2Output(
   caseFacts: string,
   runId: string,
-  retrievedDocs: LegalKnowledgeItem[]
+  retrievedDocs: LegalKnowledgeItem[],
+  queryUsed: string
 ): AgentAnalysisOutput {
   const lower = caseFacts.toLowerCase();
 
@@ -241,6 +345,8 @@ function generateDeterministicAgent2Output(
     ? LEGAL_KNOWLEDGE_BASE.find(k => k.id === 'putusan-mk-138-2009')!
     : LEGAL_KNOWLEDGE_BASE.find(k => k.id === 'pmk-2-2021-format')!;
 
+  const now = new Date().toISOString();
+
   // --- BUILD LAYER 1 ---
   const layer1: AgentLayerEvaluation = isSalahKamar
     ? {
@@ -254,7 +360,11 @@ function generateDeterministicAgent2Output(
             knowledge_entry_id: kewenanganDoc.id,
             version_id: kewenanganDoc.version_id,
             judul_dokumen: kewenanganDoc.judul,
-            kutipan_relevan: kewenanganDoc.isi_teks
+            kutipan_relevan: kewenanganDoc.isi_teks,
+            isi_teks: kewenanganDoc.isi_teks,
+            sumber: kewenanganDoc.sumber,
+            url: 'https://jdih.mkri.id',
+            timestamp: now
           }
         ]
       }
@@ -269,19 +379,26 @@ function generateDeterministicAgent2Output(
             knowledge_entry_id: kewenanganDoc.id,
             version_id: kewenanganDoc.version_id,
             judul_dokumen: kewenanganDoc.judul,
-            kutipan_relevan: kewenanganDoc.isi_teks
+            kutipan_relevan: kewenanganDoc.isi_teks,
+            isi_teks: kewenanganDoc.isi_teks,
+            sumber: kewenanganDoc.sumber,
+            url: 'https://jdih.mkri.id',
+            timestamp: now
           },
           {
             knowledge_entry_id: kewenanganUuDoc.id,
             version_id: kewenanganUuDoc.version_id,
             judul_dokumen: kewenanganUuDoc.judul,
-            kutipan_relevan: kewenanganUuDoc.isi_teks
+            kutipan_relevan: kewenanganUuDoc.isi_teks,
+            isi_teks: kewenanganUuDoc.isi_teks,
+            sumber: kewenanganUuDoc.sumber,
+            url: 'https://jdih.mkri.id',
+            timestamp: now
           }
         ]
       };
 
   // --- BUILD LAYER 2 ---
-  // If Lapis 1 is fatal (salah kamar), Lapis 2 MUST be tidak_dievaluasi
   const layer2: AgentLayerEvaluation = isSalahKamar
     ? {
         lapis_ke: 2,
@@ -302,13 +419,21 @@ function generateDeterministicAgent2Output(
             knowledge_entry_id: standingStatuteDoc.id,
             version_id: standingStatuteDoc.version_id,
             judul_dokumen: standingStatuteDoc.judul,
-            kutipan_relevan: standingStatuteDoc.isi_teks
+            kutipan_relevan: standingStatuteDoc.isi_teks,
+            isi_teks: standingStatuteDoc.isi_teks,
+            sumber: standingStatuteDoc.sumber,
+            url: 'https://jdih.mkri.id',
+            timestamp: now
           },
           {
             knowledge_entry_id: standingRulingDoc.id,
             version_id: standingRulingDoc.version_id,
             judul_dokumen: standingRulingDoc.judul,
-            kutipan_relevan: standingRulingDoc.isi_teks
+            kutipan_relevan: standingRulingDoc.isi_teks,
+            isi_teks: standingRulingDoc.isi_teks,
+            sumber: standingRulingDoc.sumber,
+            url: 'https://jdih.mkri.id',
+            timestamp: now
           }
         ]
       }
@@ -322,19 +447,26 @@ function generateDeterministicAgent2Output(
             knowledge_entry_id: standingStatuteDoc.id,
             version_id: standingStatuteDoc.version_id,
             judul_dokumen: standingStatuteDoc.judul,
-            kutipan_relevan: standingStatuteDoc.isi_teks
+            kutipan_relevan: standingStatuteDoc.isi_teks,
+            isi_teks: standingStatuteDoc.isi_teks,
+            sumber: standingStatuteDoc.sumber,
+            url: 'https://jdih.mkri.id',
+            timestamp: now
           },
           {
             knowledge_entry_id: standingRulingDoc.id,
             version_id: standingRulingDoc.version_id,
             judul_dokumen: standingRulingDoc.judul,
-            kutipan_relevan: standingRulingDoc.isi_teks
+            kutipan_relevan: standingRulingDoc.isi_teks,
+            isi_teks: standingRulingDoc.isi_teks,
+            sumber: standingRulingDoc.sumber,
+            url: 'https://jdih.mkri.id',
+            timestamp: now
           }
         ]
       };
 
   // --- BUILD LAYER 3 ---
-  // If Lapis 1 is fatal, Lapis 3 is tidak_dievaluasi. Otherwise evaluated diagnostically!
   const layer3: AgentLayerEvaluation = {
     lapis_ke: 3,
     nama: 'batu_uji',
@@ -346,12 +478,15 @@ function generateDeterministicAgent2Output(
       knowledge_entry_id: d.id,
       version_id: d.version_id,
       judul_dokumen: d.judul,
-      kutipan_relevan: d.isi_teks
+      kutipan_relevan: d.isi_teks,
+      isi_teks: d.isi_teks,
+      sumber: d.sumber,
+      url: 'https://jdih.mkri.id',
+      timestamp: now
     }))
   };
 
   // --- BUILD LAYER 4 ---
-  // If Lapis 1 is fatal, Lapis 4 is tidak_dievaluasi. Otherwise evaluated diagnostically!
   const layer4: AgentLayerEvaluation = isSalahKamar
     ? {
         lapis_ke: 4,
@@ -372,7 +507,11 @@ function generateDeterministicAgent2Output(
             knowledge_entry_id: positaPmkDoc.id,
             version_id: positaPmkDoc.version_id,
             judul_dokumen: positaPmkDoc.judul,
-            kutipan_relevan: positaPmkDoc.isi_teks
+            kutipan_relevan: positaPmkDoc.isi_teks,
+            isi_teks: positaPmkDoc.isi_teks,
+            sumber: positaPmkDoc.sumber,
+            url: 'https://jdih.mkri.id',
+            timestamp: now
           }
         ]
       }
@@ -386,7 +525,11 @@ function generateDeterministicAgent2Output(
             knowledge_entry_id: positaPmkDoc.id,
             version_id: positaPmkDoc.version_id,
             judul_dokumen: positaPmkDoc.judul,
-            kutipan_relevan: positaPmkDoc.isi_teks
+            kutipan_relevan: positaPmkDoc.isi_teks,
+            isi_teks: positaPmkDoc.isi_teks,
+            sumber: positaPmkDoc.sumber,
+            url: 'https://jdih.mkri.id',
+            timestamp: now
           }
         ]
       };
@@ -394,19 +537,19 @@ function generateDeterministicAgent2Output(
   const layers = [layer1, layer2, layer3, layer4];
 
   let hasilEvaluasi: 'layak' | 'perlu_data_tambahan' | 'tidak_layak' = 'layak';
-  let confidence: 'tinggi' | 'sedang' | 'rendah' = 'tinggi';
+  // Deterministic fallback must strictly be 'rendah' confidence per architectural integrity rule
+  const confidence: 'tinggi' | 'sedang' | 'rendah' = 'rendah';
 
   if (isSalahKamar) {
     hasilEvaluasi = 'tidak_layak';
-    confidence = 'tinggi';
   } else if (isGeneralPolicyDisagreement || hasStrongFactsNoArticles) {
     hasilEvaluasi = 'perlu_data_tambahan';
-    confidence = 'sedang';
   }
 
   return {
     agent_run_id: runId,
     agent_name: 'Agent 2 (Legal Analyst)',
+    model_used: 'deterministic-rules-engine',
     hasil_evaluasi: hasilEvaluasi,
     confidence,
     analisis_yuridis_ringkas: isSalahKamar
@@ -416,6 +559,8 @@ function generateDeterministicAgent2Output(
       : hasStrongFactsNoArticles
       ? 'Fakta kerugian kuat namun membutuhkan formulasi argumentasi pertentangan norma hukum dan pasal batu uji UUD 1945 pada posita permohonan.'
       : 'Permohonan memiliki dasar konstitusional yang solid pada yurisdiksi MK.',
-    layers
+    layers,
+    query_used: queryUsed,
+    search_sumber: 'seed_manual'
   };
 }
